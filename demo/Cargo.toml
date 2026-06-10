@@ -1,0 +1,10 @@
+[package]
+name = "demo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ml-dsa = { workspace = true }
+policy = { path = "../policy" }
+signing = { path = "../signing" }
+default-verifier = { path = "../default-verifier" }

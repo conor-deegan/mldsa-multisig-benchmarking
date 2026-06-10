@@ -1,0 +1,14 @@
+# Compiled output from Cargo
+/target/
+
+# rustfmt backup files
+**/*.rs.bk
+
+# MSVC debug info
+*.pdb
+
+# macOS
+.DS_Store
+
+# Cargo.lock is intentionally committed: this workspace builds a binary (demo)
+# and reproducible benchmark builds matter.

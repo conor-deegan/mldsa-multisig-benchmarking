@@ -1,0 +1,16 @@
+[package]
+name = "default-verifier"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ml-dsa = { workspace = true }
+policy = { path = "../policy" }
+
+[dev-dependencies]
+criterion = "0.7"
+signing = { path = "../signing" }
+
+[[bench]]
+name = "verify"
+harness = false

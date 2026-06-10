@@ -1,0 +1,10 @@
+[workspace]
+resolver = "3"
+members = ["ml-dsa", "policy", "signing", "default-verifier", "demo"]
+
+[workspace.dependencies]
+ml-dsa = { path = "ml-dsa" }
+
+# Required because the editable `ml-dsa` crate declares `[lints] workspace = true`.
+# Empty is fine: it satisfies the inheritance without applying any extra lints.
+[workspace.lints]
