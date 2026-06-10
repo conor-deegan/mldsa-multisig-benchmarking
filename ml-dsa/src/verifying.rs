@@ -11,7 +11,7 @@ use crate::{
 };
 use common::{Key, KeyExport, KeyInit, KeySizeUser};
 use module_lattice::MaybeBox;
-use shake::Shake256;
+use sha3::Shake256;
 use signature::{DigestVerifier, Error, MultipartVerifier};
 
 /// An ML-DSA verification key.
