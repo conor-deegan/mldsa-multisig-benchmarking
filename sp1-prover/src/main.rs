@@ -7,8 +7,11 @@ use std::time::Instant;
 fn main() {
     sp1_sdk::utils::setup_logger();
     // Default is execute-only (fast: cycle counts + tamper check, no proving).
-    // Pass `--prove` to also generate + verify a core proof (slow).
+    //   --prove    also generate + verify a core proof (slow)
+    //   --profile  print a host-side opcode breakdown of the execute run, then stop
+    //              (reads the same report; does NOT change the guest ELF or any numbers)
     let do_prove = std::env::args().any(|a| a == "--prove");
+    let do_profile = std::env::args().any(|a| a == "--profile");
 
     let policy = Policy::new(6, 10);
     let client = ProverClient::from_env();
@@ -27,6 +30,72 @@ fn main() {
     println!("all valid (in zkVM): {ok}");
     println!("total cycles      : {cycles}   <- PORTABLE comparison metric");
     println!("cycles / signature: {}   <- PORTABLE", cycles / n as u64);
+    println!("precompile syscalls (non-zero):");
+    for (code, count) in report.syscall_counts.iter() {
+        if *count > 0 {
+            println!("  {code:?}: {count}");
+        }
+    }
+
+    // ---- Profile mode: where do the remaining (non-precompiled) cycles go? ----
+    // Pure host-side analysis of the execute report above; returns before tamper/
+    // prove so it cannot affect those commands' output.
+    if do_profile {
+        let mut by_op: Vec<(String, u64)> = report
+            .opcode_counts
+            .iter()
+            .map(|(op, &c)| (format!("{op:?}"), c))
+            .filter(|(_, c)| *c > 0)
+            .collect();
+        by_op.sort_by(|a, b| b.1.cmp(&a.1));
+
+        let total: u64 = by_op.iter().map(|(_, c)| *c).sum();
+        let bucket = |names: &[&str]| -> u64 {
+            by_op
+                .iter()
+                .filter(|(o, _)| names.contains(&o.as_str()))
+                .map(|(_, c)| *c)
+                .sum()
+        };
+        let mul = bucket(&["MUL", "MULH", "MULHU", "MULHSU", "MULW"]);
+        let divrem = bucket(&[
+            "DIV", "DIVU", "REM", "REMU", "DIVW", "DIVUW", "REMW", "REMUW",
+        ]);
+        let load = bucket(&["LB", "LH", "LW", "LBU", "LHU", "LWU", "LD"]);
+        let store = bucket(&["SB", "SH", "SW", "SD"]);
+        let branch = bucket(&["BEQ", "BNE", "BLT", "BGE", "BLTU", "BGEU", "JAL", "JALR"]);
+        let other = total - mul - divrem - load - store - branch;
+        let pct = |x: u64| 100.0 * x as f64 / total as f64;
+
+        println!("\n==== PROFILE (execute; host-side opcode breakdown) ====");
+        println!(
+            "RISC-V instructions: {total}  (keccak-f runs as a syscall, counted above, not here)"
+        );
+        println!("by category:");
+        println!("  multiply  (MUL*)       : {mul:>11}  ({:.1}%)", pct(mul));
+        println!(
+            "  divide/rem (DIV*/REM*) : {divrem:>11}  ({:.1}%)",
+            pct(divrem)
+        );
+        println!("  memory load            : {load:>11}  ({:.1}%)", pct(load));
+        println!(
+            "  memory store           : {store:>11}  ({:.1}%)",
+            pct(store)
+        );
+        println!(
+            "  branch/jump            : {branch:>11}  ({:.1}%)",
+            pct(branch)
+        );
+        println!(
+            "  other (ALU/imm/system) : {other:>11}  ({:.1}%)",
+            pct(other)
+        );
+        println!("top 12 opcodes:");
+        for (op, c) in by_op.iter().take(12) {
+            println!("  {op:<6}: {c:>11}  ({:.1}%)", pct(*c));
+        }
+        return;
+    }
 
     // ---- Tamper: flip one signature byte; the in-guest check must fail ----
     let (mut out, _) = client

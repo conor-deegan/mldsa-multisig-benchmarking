@@ -1,6 +1,6 @@
 # mldsa-multisig-benchmarking
 
-Baseline benchmark for verifying N-of-M ML-DSA-65 signatures over the same message.
+Baseline benchmark for verifying N-of-M ML-DSA-65 multi-sig with and without ZK.
 
 ## Crates
 
@@ -26,14 +26,23 @@ Needs SP1 (`sp1up`) and `protoc`. The host crate is named `sp1-prover`, which co
 with SP1's own `sp1-prover` dependency, so qualify cargo's `-p` with `@0.1.0`:
 
 ```sh
-cargo run   -p sp1-prover@0.1.0 --release             # execute-only: cycles + tamper (fast)
-cargo run   -p sp1-prover@0.1.0 --release -- --prove  # also generate + verify a proof (slow)
-cargo bench -p sp1-prover@0.1.0                       # times core-proof generation (slow: ~min/proof)
+cargo run   -p sp1-prover@0.1.0 --release              # execute-only: cycles + tamper (fast)
+cargo run   -p sp1-prover@0.1.0 --release -- --profile  # opcode breakdown of the execute run
+cargo run   -p sp1-prover@0.1.0 --release -- --prove   # also generate + verify a proof (slow)
+cargo bench -p sp1-prover@0.1.0                        # times core-proof generation (slow: ~min/proof)
 ```
 
 Execute-only is the default so you can check cycle counts without waiting for a proof;
-add `--prove` to generate and verify a core proof.
+add `--prove` to generate and verify a core proof. `--profile` is host-side analysis of
+the same execute run (a sorted opcode histogram bucketed into multiply / divide /
+memory / branch); it reads the report only, so it never changes the guest ELF or any of
+the tracked cycle/time numbers.
 
 Metrics: **RISC-V cycles** are the portable, host-independent comparison number;
-**proving time and proof size are MacBook-relative, not deployable cost figures.**
+**proving time and proof size are MacBook-relative.**
 The guest is built for `riscv64im-succinct-zkvm-elf` by `sp1-prover/build.rs`.
+
+The guest's `Cargo.toml` patches `sha3` to SP1's Keccak-precompile fork
+(`patch-sha3-0.11.0-sp1-6.0.0`), routing every SHAKE permutation through the
+`KECCAK_PERMUTE` precompile. The patch applies only in the guest workspace, so the
+native host build keeps the stock crates.io `sha3`.

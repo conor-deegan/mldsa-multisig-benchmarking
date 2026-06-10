@@ -12,3 +12,9 @@ sp1-zkvm = "6.0.1"
 # Same local ML-DSA crate as the host, defaults OFF + alloc only (no getrandom/
 # rand_core/pkcs8/const-oid) so verification builds for the zkVM target.
 ml-dsa = { path = "../../ml-dsa", default-features = false, features = ["alloc"] }
+
+# Route SHA-3/SHAKE (the keccak-f[1600] permutation) through the SP1 keccak
+# precompile. The fork is sha3 0.11.0, matching the version ml-dsa now uses.
+# Only the guest workspace gets this patch; the native host build is unaffected.
+[patch.crates-io]
+sha3 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha3", tag = "patch-sha3-0.11.0-sp1-6.0.0" }
