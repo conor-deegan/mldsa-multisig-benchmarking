@@ -1,0 +1,20 @@
+[package]
+name = "sp1-prover"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+policy = { path = "../policy" }
+signing = { path = "../signing" }
+sp1-sdk = { version = "6.0.1", features = ["blocking"] }
+bincode = "1"
+
+[build-dependencies]
+sp1-build = "6.0.1"
+
+[dev-dependencies]
+criterion = "0.7"
+
+[[bench]]
+name = "prove"
+harness = false

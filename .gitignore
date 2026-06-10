@@ -1,5 +1,5 @@
-# Compiled output from Cargo
-/target/
+# Compiled output from Cargo (root workspace + the nested SP1 guest workspace)
+target/
 
 # rustfmt backup files
 **/*.rs.bk

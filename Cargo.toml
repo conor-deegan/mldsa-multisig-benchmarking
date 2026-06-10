@@ -1,6 +1,9 @@
 [workspace]
 resolver = "3"
-members = ["ml-dsa", "policy", "signing", "default-verifier", "demo"]
+members = ["ml-dsa", "policy", "signing", "default-verifier", "demo", "sp1-prover"]
+# The SP1 guest is its own workspace and is built for the zkVM target by
+# sp1-prover/build.rs — keep it out of the host workspace build.
+exclude = ["sp1-prover/program"]
 
 [workspace.dependencies]
 ml-dsa = { path = "ml-dsa" }

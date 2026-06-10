@@ -1,0 +1,14 @@
+# Standalone workspace: keep the guest out of the host workspace so
+# `cargo build --workspace` never tries to build it for the host target.
+[workspace]
+
+[package]
+name = "sp1-prover-program"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sp1-zkvm = "6.0.1"
+# Same local ML-DSA crate as the host, defaults OFF + alloc only (no getrandom/
+# rand_core/pkcs8/const-oid) so verification builds for the zkVM target.
+ml-dsa = { path = "../../ml-dsa", default-features = false, features = ["alloc"] }
