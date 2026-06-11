@@ -136,4 +136,16 @@ fn main() {
     println!("prove time        : {prove_time:.2?}   <- MacBook-relative, NOT a deployable cost");
     println!("verify time       : {verify_time:.2?}   <- MacBook-relative");
     println!("proof size        : {proof_size} bytes   <- MacBook-relative");
+
+    // sp1-cuda's blocking client panics in its Drop impls ("no reactor running")
+    // because they spawn a Tokio cleanup task, but the runtime is already gone by
+    // the time main returns -> panic-in-destructor -> abort. The proof above is
+    // already generated + verified, so flush and exit cleanly to skip those
+    // teardown-only destructors. CUDA build only; the CPU/Mac build is unaffected.
+    #[cfg(feature = "cuda")]
+    {
+        use std::io::Write;
+        std::io::stdout().flush().unwrap();
+        std::process::exit(0);
+    }
 }
