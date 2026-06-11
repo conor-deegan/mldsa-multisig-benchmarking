@@ -9,6 +9,12 @@ signing = { path = "../signing" }
 sp1-sdk = { version = "6.0.1", features = ["blocking"] }
 bincode = "1"
 
+# Opt-in GPU proving. Off by default so the Mac (CPU) build is untouched.
+# On an NVIDIA box: `cargo run -p sp1-prover@0.1.0 --release --features cuda -- --prove`
+# plus `SP1_PROVER=cuda` in the env (ProverClient::from_env reads it).
+[features]
+cuda = ["sp1-sdk/cuda"]
+
 [build-dependencies]
 sp1-build = "6.0.1"
 

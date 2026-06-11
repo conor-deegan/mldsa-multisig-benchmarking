@@ -48,3 +48,41 @@ The guest's `Cargo.toml` patches `sha3` to SP1's Keccak-precompile fork
 (`patch-sha3-0.11.0-sp1-6.0.0`), routing every SHAKE permutation through the
 `KECCAK_PERMUTE` precompile. The patch applies only in the guest workspace, so the
 native host build keeps the stock crates.io `sha3`.
+
+### GPU proving (optional)
+
+GPU only accelerates **proving** - cycle counts, the opcode breakdown, and Keccak counts
+come from execute mode and are identical on any host, so a GPU changes only the `--prove`
+numbers. It's gated behind an opt-in `cuda` feature, so the default Mac/CPU build is
+the not impacted.
+
+On an **NVIDIA** box (SP1's GPU prover runs in a Docker container, so the host needs the
+NVIDIA driver + Docker + NVIDIA Container Toolkit, plus the usual Rust / `sp1up` / `protoc`):
+
+```sh
+SP1_PROVER=cuda cargo run -p sp1-prover@0.1.0 --release --features cuda -- --prove
+```
+
+`ProverClient::from_env()` reads `SP1_PROVER`, so there's no code change, just the
+`--features cuda` build flag and the env var. The first run pulls the GPU prover container
+(one-time slow); later runs are fast.
+
+#### GPU set up
+
+Any GPU box with ≥16–24 GB VRAM is fine for this.
+
+```
+# toolchain
+curl https://sh.rustup.rs -sSf | sh -s -- -y && source "$HOME/.cargo/env"
+curl -L https://sp1up.succinct.xyz | bash && sp1up
+sudo apt-get update && sudo apt-get install -y protobuf-compiler   # protoc
+# sanity-check Docker can see the GPU
+docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi
+# then clone this repo
+# then, in the repo:
+SP1_PROVER=cuda cargo run -p sp1-prover@0.1.0 --release --features cuda -- --prove
+```
+
+Remember the cycle/opcode/keccak numbers won't change (that's the point — same work, different prover
+hardware), so the only line worth recording from the GPU run is the new prove time to drop alongside
+the M5 numbers in RESULTS.md.
