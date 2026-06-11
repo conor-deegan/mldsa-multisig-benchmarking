@@ -100,3 +100,31 @@ My interpretation:
 **Implication for precompiles:** There's nothing left worth precompiling I think. None of SP1's
 other stock precompiles (SHA-256, the elliptic curves, 256-bit bigint) map onto ML-DSA,
 and even a bespoke NTT/modmul precompile would impact ≤5.5%.
+
+## GPU testing
+
+Config:
+- 1x A10
+- 24GB VRAM/GPU
+- 30 vCPUs
+- 226  GiB  RAM
+- 1.3 TiB SSD
+- $1.29 GPU/HR
+- Image: Lambda Stack 24.04
+
+### M5 (CPU) vs A10 (CUDA) — 6-of-10, core mode
+
+Same binary, same statement, same inputs. Only the prover backend differs (`SP1_PROVER=cuda`).
+
+| Metric | M5 (CPU) | A10 (CUDA) | Delta |
+|--------|---------:|-----------:|-------|
+| Total cycles | 13611496 | 13611496 | identical (portable) |
+| Prove time   | 119.95 s | 5.70 s    | **~21× faster** |
+| Verify time  | 116.37 ms | 462.12 ms | ~4× slower |
+| Proof size   | 5893025 B | 7341627 B | +24.6% |
+
+**Reasoning:**
+
+1. **Cycles are identical** - execute is deterministic and host-independent, so the GPU is a drop-in prover doing the exact same work.
+2. **Prove time ~21× faster** is the whole point of the GPU, and the only metric it targets.
+3. **Bigger proof + slower verify are not a regression.** Cycle counts match, so it isn't extra work, the CUDA prover just shards differently and emits a larger proof. Verify runs CPU-side (on this box's vCPUs, weaker per-core than the M5) and scales with proof structure, so a +25% proof verifies ~4× slower. If needed a small, fast-to-verify proof is needed we could look at compression/Groth16 wrapping and not core mode but this may impact PQ-ness.

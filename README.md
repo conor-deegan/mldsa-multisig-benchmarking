@@ -74,9 +74,13 @@ Any GPU box with ≥16–24 GB VRAM is fine for this.
 ```
 # toolchain
 curl https://sh.rustup.rs -sSf | sh -s -- -y && source "$HOME/.cargo/env"
-curl -L https://sp1up.succinct.xyz | bash && sp1up
+curl -L https://sp1up.succinct.xyz | bash && source /home/ubuntu/.bashrc && sp1up
 sudo apt-get update && sudo apt-get install -y protobuf-compiler   # protoc
 # sanity-check Docker can see the GPU
+sudo docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi # should print a table
+# add yourself to the docker group so you can run Docker without sudo
+sudo usermod -aG docker $USER
+newgrp docker     # apply the group in this shell (or just log out and back in)
 docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi
 # then clone this repo
 # then, in the repo:
