@@ -2,8 +2,12 @@
 resolver = "3"
 members = ["ml-dsa", "policy", "signing", "default-verifier", "demo", "sp1-prover", "binius-prover"]
 # The SP1 guest is its own workspace and is built for the zkVM target by
-# sp1-prover/build.rs — keep it out of the host workspace build.
-exclude = ["sp1-prover/program"]
+# sp1-prover/build.rs — keep it out of the host workspace build. The Binius proof
+# runner is likewise excluded: it owns the upstream `binius-prover` crate, which must
+# stay out of our `binius-prover` crate's dependency closure (else the frozen oracle
+# command `cargo test -p binius-prover` is ambiguous). It is driven as a subprocess —
+# see binius-proof-runner/.
+exclude = ["sp1-prover/program", "binius-proof-runner"]
 
 [workspace.dependencies]
 ml-dsa = { path = "ml-dsa" }

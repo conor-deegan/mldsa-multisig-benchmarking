@@ -26,7 +26,7 @@
 
 #![allow(dead_code)]
 
-use binius_frontend::{CircuitBuilder, Wire};
+use binius_frontend::{Circuit, CircuitBuilder, Wire};
 
 use crate::decode::{bit_unpack_gamma1, decode_hint, simple_bit_pack, simple_bit_unpack, K};
 use crate::field::FieldConsts;
@@ -168,6 +168,56 @@ pub fn recompute_ctilde(
     let cp = shake256(b, &cp_in, 64 + 768, 48); // 6 words, exact
 
     std::array::from_fn(|i| cp[i])
+}
+
+/// A compiled single-signature ML-DSA-65 verify circuit, reusable across many
+/// witnesses (SPEC.md §5, milestone M5). The N-of-M layer builds this **once** and
+/// populates it per `(key, msg, sig)` slot — peak memory stays at one single-sig
+/// circuit regardless of `n` (NOTES: building one giant `n`-signature circuit would
+/// OOM at `n = 6`).
+///
+/// The lone constraint coupling is `c̃′ == sig.c̃` (the signature's own challenge,
+/// `sig_wires[0..6]`): the witness populates iff the in-circuit `raw_verify_mu`
+/// reproduces the stored challenge — i.e. iff the reference's per-signature
+/// `key.verify(msg, sig)` (after a successful `Signature::decode`) would return
+/// `Ok`. A malformed hint trips `decode_hint`'s validity asserts instead, the
+/// in-circuit analogue of `Signature::try_from` dropping the signature.
+pub struct SingleSig {
+    /// The compiled circuit; `populate_wire_witness` is `Ok` iff this slot verifies.
+    pub circuit: Circuit,
+    /// `inout` words for the 1952-byte verifying key (ρ ∥ t1).
+    pub key_wires: Vec<Wire>,
+    /// `inout` words for the 64-byte message.
+    pub msg_wires: Vec<Wire>,
+    /// `witness` words for the 3309-byte signature (c̃ ∥ z ∥ h).
+    pub sig_wires: Vec<Wire>,
+}
+
+/// Build the single-signature verify circuit and return it with its bound wires.
+pub fn build_single_sig() -> SingleSig {
+    let b = CircuitBuilder::new();
+    let fc = FieldConsts::new(&b);
+    let nc = NttConsts::new(&b);
+    let hc = HintConsts::new(&b);
+
+    let key_wires: Vec<Wire> = (0..VK_WORDS).map(|_| b.add_inout()).collect();
+    let msg_wires: Vec<Wire> = (0..MSG_WORDS).map(|_| b.add_inout()).collect();
+    let sig_wires: Vec<Wire> = (0..SIG_WORDS).map(|_| b.add_witness()).collect();
+
+    let cp = recompute_ctilde(&b, &fc, &nc, &hc, &key_wires, &msg_wires, &sig_wires);
+    // Couple c̃′ to the signature's own stored c̃ (sig_wires[0..6]); a mismatch — the
+    // reference's per-signature reject — makes this witness unsatisfiable.
+    for i in 0..6 {
+        b.assert_eq("ctilde_eq", cp[i], sig_wires[i]);
+    }
+
+    let circuit = b.build();
+    SingleSig {
+        circuit,
+        key_wires,
+        msg_wires,
+        sig_wires,
+    }
 }
 
 #[cfg(test)]

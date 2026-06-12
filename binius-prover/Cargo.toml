@@ -12,10 +12,14 @@ binius-frontend = { git = "https://github.com/binius-zk/binius64", rev = "8f21b3
 binius-circuits = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
 binius-core     = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
 
-# Proving/verifying (added at M6). NOTE: the upstream prover crate is also named
-# `binius-prover`, which clashes with this crate's name, so it must be aliased:
-#   binius64-prover   = { git = "...", rev = "...", package = "binius-prover" }
-#   binius64-verifier = { git = "...", rev = "...", package = "binius-verifier" }
+# Proving/verifying (M6). The upstream prover crate is ALSO named `binius-prover`;
+# putting it (even transitively) in this crate's dependency closure makes the frozen
+# oracle command `cargo test -p binius-prover` ambiguous (two packages named
+# `binius-prover`). So proving is delegated to the workspace-EXCLUDED `binius-proof-
+# runner` binary (it owns the upstream prover/verifier), driven as a subprocess by
+# `prove_and_verify` over serialized constraint-system + witness files. This crate
+# therefore needs only the serialization traits, not the prover. See SPEC.md §8.6.
+binius-utils = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
 
 # The public API (`Case`, `build(&Policy)`) names these types, so they are
 # library dependencies, not just dev-dependencies.

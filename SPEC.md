@@ -288,6 +288,28 @@ The §2–§4 blanks were filled against primary sources (binius64 `main`
    one documented, corpus-unobservable deviation; a maliciously crafted high-norm `z`
    hashing to the right c̃ is infeasible, not impossible.)
 
+6. **The upstream prover crate name clashes with ours, so M6 proving is out-of-process.**
+   The original Cargo.toml note proposed pulling the proof system in as
+   `binius64-prover = { …, package = "binius-prover" }`. That alias fixes the *import*
+   name but NOT cargo's package-spec resolution: the upstream package is literally named
+   `binius-prover`, identical to this crate, so the moment it enters this crate's
+   dependency closure (directly or transitively) the frozen oracle command
+   `cargo test -p binius-prover` fails with `specification 'binius-prover' is ambiguous`
+   (two packages share the name; version/source cannot disambiguate a bare-name `-p`
+   spec, and a workspace member is not preferred — verified empirically with cargo 1.85).
+   Renaming our crate is impossible (the oracle uses both `-p binius-prover` and
+   `use binius_prover::…`). So the upstream prover/verifier live in a SEPARATE,
+   workspace-EXCLUDED crate `binius-proof-runner`, and `prove_and_verify` drives it as a
+   subprocess: it serialises the single-sig `ConstraintSystem` (once) and each slot's
+   `(public, non-public)` witness halves to temp files (the upstream example CLI's
+   `save`/`load-prove` split), the runner deserialises them, sets up the `StdHashSuite`
+   (SHA-256) prover/verifier once, proves+verifies every slot, and reports the aggregate
+   proof size and prove time. The runner builds into its own target dir so the nested
+   `cargo build` never contends with the outer `cargo test` build lock. This keeps the
+   upstream `binius-prover` package entirely out of this crate's closure, so the oracle
+   command stays unambiguous. The N-of-M proof is the AND of the `n` per-slot single-sig
+   proofs (each slot's `c̃′ == c̃` coupling), matching the §5 aggregation.
+
 ### Oracle behaviour during intermediate milestones (M0–M3)
 While `circuit_accepts` is incomplete it rejects every case, so the oracle reports
 COMPLETENESS failures (honest cases) AND spurious DIFFERENTIAL failures of the form

@@ -185,3 +185,5 @@ One line per increment: what changed + current oracle status. Newest at the bott
   still RED by design (circuit_accepts is the M0 TODO(stub); verify is internal).
   Next: M5 — wire circuit_accepts to run verify per (key[i],sig[i]) pair for i<n,
   reject if <n sigs supplied or any sig's c̃′≠c̃, exposing key/msg inout + sig witness.
+
+M5: circuit_accepts wired (N-of-M = AND of slot_verifies); full xcheck GREEN — 4 policies, 16 honest + 64 corrupt each, 565s on the 15GB box.
