@@ -388,6 +388,7 @@ pub struct ProofStats {
     pub n_intmul: usize,
     pub n_witness_words: usize,
     pub prove_ms: u128,
+    pub verify_ms: u128,
     pub proof_bytes: usize,
 }
 
@@ -506,9 +507,9 @@ fn build_runner() -> Result<PathBuf, CircuitError> {
 /// single-sig circuit and verifying every proof. Proving runs in the
 /// `binius-proof-runner` subprocess (which owns the upstream prover); one invocation
 /// per call sets up once and proves all `n` slots. The reported [`ProofStats`] aggregate
-/// the `n` proofs: `prove_ms` and `proof_bytes` sum over the slots (the whole N-of-M
-/// proof bundle), while the constraint counts are the single-sig circuit's (identical
-/// per slot).
+/// the `n` proofs: `prove_ms`, `verify_ms` and `proof_bytes` sum over the slots (the whole
+/// N-of-M proof bundle), while the constraint counts are the single-sig circuit's
+/// (identical per slot).
 pub fn prove_and_verify(circuit: &Circuit, case: &Case) -> Result<ProofStats, CircuitError> {
     let n = circuit.policy.n;
     let single = &circuit.single;
@@ -558,7 +559,7 @@ pub fn prove_and_verify(circuit: &Circuit, case: &Case) -> Result<ProofStats, Ci
         )));
     }
 
-    // The runner prints `OK <total_proof_bytes> <total_prove_ms>` on success.
+    // The runner prints `OK <total_proof_bytes> <total_prove_ms> <total_verify_ms>`.
     let stdout = String::from_utf8_lossy(&output.stdout);
     let line = stdout
         .lines()
@@ -573,15 +574,17 @@ pub fn prove_and_verify(circuit: &Circuit, case: &Case) -> Result<ProofStats, Ci
     };
     let proof_bytes = parse(it.next(), "proof_bytes")? as usize;
     let prove_ms = parse(it.next(), "prove_ms")?;
+    let verify_ms = parse(it.next(), "verify_ms")?;
 
     Ok(ProofStats {
         // `n_bitand`/`n_intmul` count the shared single-sig slot circuit (identical
-        // for every slot); `n_witness_words`, `prove_ms` and `proof_bytes` are
-        // aggregates summed across all n slots.
+        // for every slot); `n_witness_words`, `prove_ms`, `verify_ms` and `proof_bytes`
+        // are aggregates summed across all n slots.
         n_bitand: stat.n_and_constraints,
         n_intmul: stat.n_mul_constraints,
         n_witness_words: witness_words_total,
         prove_ms,
+        verify_ms,
         proof_bytes,
     })
 }

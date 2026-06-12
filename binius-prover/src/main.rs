@@ -33,8 +33,8 @@ fn main() {
     if prove {
         match prove_and_verify(&circuit, &case) {
             Ok(s) => println!(
-                "proof verified: {} bytes, {} ms (n_bitand={}, n_intmul={}, witness_words={})",
-                s.proof_bytes, s.prove_ms, s.n_bitand, s.n_intmul, s.n_witness_words
+                "proof verified: {} bytes, prove {} ms, verify {} ms (n_bitand={}, n_intmul={}, witness_words={})",
+                s.proof_bytes, s.prove_ms, s.verify_ms, s.n_bitand, s.n_intmul, s.n_witness_words
             ),
             Err(e) => println!("prove_and_verify: {e}"),
         }
