@@ -51,3 +51,16 @@ One line per increment: what changed + current oracle status. Newest at the bott
   (a bad twiddle table cannot survive it). 13/13 lib tests pass. Oracle still RED by
   design (circuit_accepts remains the M0 TODO(stub); M2 is internal gadgets only).
   Next: M3 hashing (SHAKE128/256 on keccak_f1600) + byte↔coeff decode (t1/z/c̃/h/w1).
+- M3a SHAKE: added `src/shake.rs` (private `mod shake`) — `shake128`/`shake256`
+  XOFs built on upstream `Permutation::keccak_f1600` with the FIPS 202 `0x1F` pad
+  (not the Keccak gadget's `0x01`). Shared `sponge(rate_words, in_len, out_len)`:
+  pad10*1 (mirrors upstream keccak256's partial-word masking + `(len+1).div_ceil`
+  block count, domain byte swapped to 0x1F), absorb by XOR into leading rate lanes,
+  multi-block squeeze permuting between rate reads. All lengths compile-time known
+  (no data-dependent loop). 8 bytes/word little-endian, matching upstream + sha3.
+  No new hints/nondeterminism (keccak_f1600 is deterministic bit-ops). 4 property
+  tests green vs the `sha3` crate (added as dev-dep): shake128/256 across rate- and
+  word-boundary in/out lengths incl. the 840 B ExpandA squeeze and 48/64 B c̃/μ
+  sizes, a wrong-output rejection, and a SHAKE128≠SHAKE256 separation. 17/17 lib
+  tests pass. Oracle still RED by design (circuit_accepts is the M0 TODO(stub)).
+  Next: M3b byte↔coeff decode (t1 Encode<10>, z BitUnpack<20>, c̃, h, w1 Encode<4>).
