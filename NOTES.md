@@ -160,3 +160,28 @@ One line per increment: what changed + current oracle status. Newest at the bott
   SampleInBall). Next: wire the §4 single-sig verify chain in circuit_accepts —
   decode→SampleInBall/NTT(c)→NTT(z)→ExpandA→Âẑ−ĉt̂→NTT⁻¹→UseHint→w1 encode→c̃′ via
   μ/tr SHAKE256→c̃ equality, exposing key/sig bytes as inout/witness wires.
+- M4 single-sig verify chain: added `src/verify.rs` (private `mod verify`) —
+  `recompute_ctilde`, the in-circuit `raw_verify_mu` (`ml-dsa/src/verifying.rs:106`)
+  that returns the recomputed 48-byte `c̃′` (6 words) from vk/msg/sig byte wires.
+  Composes every gadget end-to-end: decode t1 (→2¹³·t1→NTT→t1_2d_hat), c̃/z/hint
+  decode, SampleInBall→NTT(c), NTT(z), ExpandA Â[r][s], Âẑ−ĉt̂ (pointwise+accumulate),
+  NTT⁻¹→UseHint→w1, SimpleBitPack₄→w1_enc, then tr=H(vk)[..64], μ=H(tr∥00∥00∥M)[..64]
+  (the 2-byte domain offset re-packs M off the word boundary via shl/shr/bor), and
+  c̃′=H(μ∥w1_enc)[..48]. All byte regions word-aligned so slicing is exact. The new
+  `verifies_real_signature` property test runs the WHOLE chain on a genuine
+  `signing::sign` ML-DSA-65 signature and confirms c̃′==c̃ (the signature's own c̃);
+  `rejects_wrong_ctilde` confirms the coupling bites. Both green.
+- M4 ExpandA optimisation: packed the witnessed-routing compaction's [accept,rank,z]
+  into ONE 64-bit wire (z∈[0,23), rank∈[23,32), accept@33) so each output slot reads
+  via a single `single_wire_multiplex` not three — cutting one ExpandA poly 239k→94k
+  gates (228k→81k AND) and the full single-sig circuit 8.08M→3.72M gates (build 7.84GB
+  →2.93GB RSS). This was necessary: the 3-mux version OOM'd populate on the 15GB host.
+  circuit-adversary re-audited the repack (field-overlap, bit-32 gap, a_sel=p>>33
+  needing no mask, routing invariant, out-of-range src): verdict SOUND, 0 holes.
+  Key M5 insight recorded: N-of-M = AND of n independent single-sig checks, so
+  `circuit_accepts` can reuse ONE single-sig circuit n times (peak mem ~3GB regardless
+  of n) rather than building one giant n-signature circuit (~22M gates at n=6 would
+  OOM build). 40/40 lib tests pass (2 ignored = circuit-size measurements). Oracle
+  still RED by design (circuit_accepts is the M0 TODO(stub); verify is internal).
+  Next: M5 — wire circuit_accepts to run verify per (key[i],sig[i]) pair for i<n,
+  reject if <n sigs supplied or any sig's c̃′≠c̃, exposing key/msg inout + sig witness.

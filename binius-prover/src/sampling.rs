@@ -146,17 +146,29 @@ pub fn rej_ntt_poly(b: &CircuitBuilder, rho: &[Wire], r: u8, s: u8) -> Vec<Wire>
     // ── Compaction by sound witnessed routing ─────────────────────────────────
     let src = b.call_hint(ExpandACompactionHint, &[N_CANDIDATES, N], &accept);
 
-    // One group per candidate: [accept, rank, z]. Built once, shared across slots.
-    let groups: Vec<[Wire; 3]> = (0..N_CANDIDATES)
-        .map(|c| [accept[c], rank[c], z[c]])
+    // Pack each candidate's [accept, rank, z] into a single 64-bit wire so the
+    // per-slot read is **one** `single_wire_multiplex` (279 selects) rather than
+    // three (837) — a 3× cut on the dominant ExpandA cost, with the soundness
+    // argument unchanged (the three fields are unpacked back out and asserted
+    // identically). Layout: z in bits [0,23) (< q < 2²³), rank in [23,32)
+    // (≤ 280 < 2⁹), accept at bit 33. No fields overlap.
+    let mask23 = b.add_constant_64((1u64 << 23) - 1);
+    let mask9 = b.add_constant_64((1u64 << 9) - 1);
+    let packed: Vec<Wire> = (0..N_CANDIDATES)
+        .map(|c| {
+            let r_sh = b.shl(rank[c], 23);
+            let a_sh = b.shl(accept[c], 33);
+            b.bor(b.bor(z[c], r_sh), a_sh)
+        })
         .collect();
-    let refs: Vec<&[Wire]> = groups.iter().map(|g| g.as_slice()).collect();
 
     (0..N)
         .map(|k| {
             let sel = src[k];
-            let picked = binius_circuits::multiplexer::multi_wire_multiplex(b, &refs, sel);
-            let (a_sel, rank_sel, z_sel) = (picked[0], picked[1], picked[2]);
+            let p = single_wire_multiplex(b, &packed, sel);
+            let z_sel = b.band(p, mask23);
+            let rank_sel = b.band(b.shr(p, 23), mask9);
+            let a_sel = b.shr(p, 33);
             // The selected candidate must be accepted and have prefix rank exactly k;
             // together these identify the unique k-th accepted candidate, pinning z.
             b.assert_eq("expandA_routed_accept", a_sel, one);

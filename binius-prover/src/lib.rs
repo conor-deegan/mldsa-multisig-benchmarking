@@ -45,6 +45,11 @@ mod usehint;
 /// candidates into the 256 NTT-domain coefficients.
 mod sampling;
 
+/// The §4 single-signature `raw_verify_mu` relation (M4): composes every gadget
+/// above into the recomputed `c̃′`, which the N-of-M layer (M5) couples to the
+/// decoded `c̃` per signature.
+mod verify;
+
 use ml_dsa::{KeyInit, MlDsa65, Seed, Signature, Signer, SigningKey, VerifyingKey};
 use policy::Policy;
 use rand::RngCore;
