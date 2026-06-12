@@ -1,4 +1,4 @@
-//! In-circuit number-theoretic transform over `R_q = Z_q[x]/(x²⁵⁶ + 1)` (SPEC.md §2).
+//! In-circuit number-theoretic transform over `R_q = Z_q[x]/(x²⁵⁶ + 1)`.
 //!
 //! ML-DSA-65 does all of its polynomial multiplication in the NTT domain, and the
 //! `ml-dsa` reference samples `Â = ExpandA(ρ)` directly there (`sampling.rs`), so to

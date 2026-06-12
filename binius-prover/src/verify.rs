@@ -1,13 +1,13 @@
-//! Single-signature ML-DSA-65 verification, in-circuit (SPEC.md §4, milestone M4).
+//! Single-signature ML-DSA-65 verification, in-circuit.
 //!
 //! This module composes every lower-layer gadget (field, NTT, SHAKE, decode,
 //! sampling, UseHint) into the exact `raw_verify_mu` relation the oracle is
 //! differential against (`ml-dsa/src/verifying.rs:106`). The reference decides
-//! **accept ⇔ c̃ = c̃′** and nothing else (SPEC.md §4, Correction); so does this.
+//! **accept ⇔ c̃ = c̃′** and nothing else; so does this.
 //!
 //! [`recompute_ctilde`] takes the on-the-wire verifying-key bytes, the 64-byte
 //! message and the signature bytes (all as little-endian-packed `Wire` words) and
-//! returns the recomputed 48-byte challenge `c̃′` as 6 words. The N-of-M layer (M5)
+//! returns the recomputed 48-byte challenge `c̃′` as 6 words. The N-of-M layer
 //! couples each signature's `c̃′` to its decoded `c̃` with `assert_eq`; a mismatch
 //! makes that subcircuit unsatisfiable, exactly the reference's per-signature
 //! `false`.
@@ -69,7 +69,7 @@ fn matrix_vector_row(
 ///
 /// `key_words` / `msg_words` / `sig_words` are the little-endian-packed encodings
 /// (lengths [`VK_WORDS`] / [`MSG_WORDS`] / [`SIG_WORDS`]). The hint-decode validity
-/// constraints (SPEC.md §4 item 1) are emitted as a side effect of `decode_hint`,
+/// constraints are emitted as a side effect of `decode_hint`,
 /// so a malformed hint makes the enclosing circuit unsatisfiable — the in-circuit
 /// analogue of `Hint::bit_unpack` returning `None`.
 pub fn recompute_ctilde(
@@ -171,9 +171,9 @@ pub fn recompute_ctilde(
 }
 
 /// A compiled single-signature ML-DSA-65 verify circuit, reusable across many
-/// witnesses (SPEC.md §5, milestone M5). The N-of-M layer builds this **once** and
+/// witnesses. The N-of-M layer builds this **once** and
 /// populates it per `(key, msg, sig)` slot — peak memory stays at one single-sig
-/// circuit regardless of `n` (NOTES: building one giant `n`-signature circuit would
+/// circuit regardless of `n` (building one giant `n`-signature circuit would
 /// OOM at `n = 6`).
 ///
 /// The lone constraint coupling is `c̃′ == sig.c̃` (the signature's own challenge,

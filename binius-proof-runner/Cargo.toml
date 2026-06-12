@@ -1,13 +1,3 @@
-# Out-of-process Binius64 proof generator for the `binius-prover` crate's M6 step.
-#
-# WHY THIS CRATE EXISTS: the upstream proving crate is itself named `binius-prover`,
-# identical to our public crate. If it appears anywhere in our crate's dependency
-# closure, the frozen oracle command `cargo test -p binius-prover` becomes ambiguous
-# ("specification `binius-prover` is ambiguous"). So the upstream prover/verifier live
-# HERE, in a crate that is EXCLUDED from the workspace and never a dependency of
-# `binius-prover`; the library drives it as a subprocess over serialized
-# constraint-system + witness files. An empty `[workspace]` table makes this its own
-# workspace root (so building it via `--manifest-path` does not re-enter the parent).
 [package]
 name = "binius-proof-runner"
 version = "0.1.0"

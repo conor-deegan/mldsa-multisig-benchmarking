@@ -1,4 +1,4 @@
-//! Mod-q field arithmetic gadgets for ML-DSA-65 (SPEC.md §2).
+//! Mod-q field arithmetic gadgets for ML-DSA-65.
 //!
 //! ML-DSA-65 works in `Z_q` with `q = 2²³ − 2¹³ + 1 = 8380417`, a 23-bit prime.
 //! Crucially `q` is **single-word**: every residue, every product (`< q² < 2⁴⁶`)
@@ -9,9 +9,9 @@
 //! gadgets here take reduced inputs and return reduced outputs, so they compose.
 //! [`mul_mod_q`] is the only one that introduces a nondeterministic (hinted)
 //! value — its quotient/remainder — and it range-checks both, which is the whole
-//! difference between a sound circuit and a worthless one (CLAUDE.md).
+//! difference between a sound circuit and a worthless one.
 
-// These gadgets are the foundation the NTT/decode/verify layers (M2+) build on;
+// These gadgets are the foundation the NTT/decode/verify layers build on;
 // until those land some items are only exercised by this module's own tests.
 #![allow(dead_code)]
 
@@ -20,7 +20,7 @@ use binius_frontend::{CircuitBuilder, Wire};
 /// The ML-DSA-65 modulus `q = 2²³ − 2¹³ + 1`.
 pub const Q: u64 = 8_380_417;
 
-/// `256⁻¹ mod q`, the NTT inverse-scaling constant (SPEC.md §2). Kept here so the
+/// `256⁻¹ mod q`, the NTT inverse-scaling constant. Kept here so the
 /// field layer owns every q-dependent constant.
 pub const N_INV: u64 = 8_347_681;
 
@@ -46,7 +46,7 @@ impl FieldConsts {
 
 /// `(a · x) mod q` for reduced inputs `a, x ∈ [0, q)`.
 ///
-/// Soundness (SPEC.md §2): the integer product `p = a·x < q² < 2⁴⁶` lands wholly
+/// Soundness: the integer product `p = a·x < q² < 2⁴⁶` lands wholly
 /// in the low word of `imul`, so the high word must be zero. A divmod **hint**
 /// advises `(k, r)` with `p = k·q + r`; we re-multiply `k·q` in-circuit, add `r`,
 /// and assert it equals `p`. The remainder **and** quotient are range-checked
@@ -62,7 +62,7 @@ pub fn mul_mod_q(b: &CircuitBuilder, c: &FieldConsts, a: Wire, x: Wire) -> Wire 
 
 /// Reduce any single-word value `p ∈ [0, 2⁶⁴)` (an `imul` low word, or a
 /// lazy-reduction accumulator of several products) to `[0, q)`. Factored out of
-/// [`mul_mod_q`] so the NTT layer (SPEC.md §2 "lazy reduction") can reduce a
+/// [`mul_mod_q`] so the NTT layer can reduce a
 /// sum-of-products once at the end of an accumulation rather than per term — for
 /// the corpus such accumulators of ≤ L = 5 products stay `< 5q² < 2⁴⁹`.
 ///
@@ -101,7 +101,7 @@ pub fn reduce_mod_q(b: &CircuitBuilder, c: &FieldConsts, p: Wire) -> Wire {
 
 /// `(a + x) mod q` for reduced inputs. Deterministic: `s = a + x < 2q < 2²⁴` never
 /// carries out of the word, then a single conditional subtract of `q` canonicalises
-/// (SPEC.md §2). No hint, no range-check needed.
+/// No hint, no range-check needed.
 pub fn add_mod_q(b: &CircuitBuilder, c: &FieldConsts, a: Wire, x: Wire) -> Wire {
     let (s, _carry) = b.iadd(a, x);
     let ge = b.icmp_uge(s, c.q);
@@ -111,7 +111,7 @@ pub fn add_mod_q(b: &CircuitBuilder, c: &FieldConsts, a: Wire, x: Wire) -> Wire 
 
 /// `(a − x) mod q` for reduced inputs. Deterministic: compute `a − x` (wrapping),
 /// and when `a < x` add back `q` (the borrow wraps the `2⁶⁴` away, leaving
-/// `a − x + q ∈ [1, q)`); otherwise keep `a − x ∈ [0, q)` (SPEC.md §2).
+/// `a − x + q ∈ [1, q)`); otherwise keep `a − x ∈ [0, q)`.
 pub fn sub_mod_q(b: &CircuitBuilder, c: &FieldConsts, a: Wire, x: Wire) -> Wire {
     let lt = b.icmp_ult(a, x);
     let (d, _bout) = b.isub_bin_bout(a, x, c.zero);
@@ -230,7 +230,10 @@ mod tests {
     #[test]
     fn add_mod_q_edge_cases() {
         for &(a, x) in &[(0, 0), (Q - 1, Q - 1), (Q - 1, 1), (1, Q - 1), (0, Q - 1)] {
-            assert!(check2(add_mod_q, a, x, (a + x) % Q), "add_mod_q edge ({a},{x})");
+            assert!(
+                check2(add_mod_q, a, x, (a + x) % Q),
+                "add_mod_q edge ({a},{x})"
+            );
         }
     }
 

@@ -1,4 +1,4 @@
-//! Byte ↔ coefficient decode/encode gadgets (SPEC.md §2, milestone M3b).
+//! Byte ↔ coefficient decode/encode gadgets
 //!
 //! ML-DSA's on-the-wire objects (the verifying key's `t1`, a signature's `z`, and
 //! the recomputed `w1`) are bit-packed: each degree-256 polynomial stores its
@@ -64,7 +64,11 @@ fn extract_field(b: &CircuitBuilder, words: &[Wire], bit: usize, d: u32, mask: W
 /// `[0, 2^d)`. Used for `t1` (`d = 10`); the result is a canonical residue because
 /// `2^d < q`.
 pub fn simple_bit_unpack(b: &CircuitBuilder, words: &[Wire], d: u32) -> Vec<Wire> {
-    debug_assert_eq!(words.len(), 4 * d as usize, "expected 4·d words for one poly");
+    debug_assert_eq!(
+        words.len(),
+        4 * d as usize,
+        "expected 4·d words for one poly"
+    );
     let mask = b.add_constant_64((1u64 << d) - 1);
     (0..N)
         .map(|i| extract_field(b, words, i * d as usize, d, mask))
@@ -77,7 +81,7 @@ pub fn simple_bit_unpack(b: &CircuitBuilder, words: &[Wire], d: u32) -> Vec<Wire
 /// coefficient is exactly `sub_mod_q(γ1, x)`.
 ///
 /// No `‖z‖∞` norm check is emitted here — `raw_verify_mu` decides on `c̃` equality
-/// alone, and a corrupted `z` perturbs `c̃′` (SPEC.md §4 Correction). A
+/// alone, and a corrupted `z` perturbs `c̃′`. A
 /// norm-violating `z` is already dropped earlier by `Signature::decode` on the
 /// reference path, so honest cases never exercise the out-of-range region.
 pub fn bit_unpack_gamma1(b: &CircuitBuilder, c: &FieldConsts, words: &[Wire]) -> Vec<Wire> {
@@ -94,7 +98,7 @@ pub fn bit_unpack_gamma1(b: &CircuitBuilder, c: &FieldConsts, words: &[Wire]) ->
 
 /// `SimpleBitPack` over `d` bits: pack 256 coefficient wires (each assumed `< 2^d`)
 /// back into `4·d` little-endian words. Used to re-encode `w1` (`d = 4`) into the
-/// 768-byte string absorbed into SHAKE256 for `c̃′` (SPEC.md §4 item 8).
+/// 768-byte string absorbed into SHAKE256 for `c̃′`.
 ///
 /// Each output word holds `64 / d` coefficients; coefficient `i` contributes its low
 /// `d` bits at bit `i·d`. We mask each coefficient to `d` bits defensively (the
@@ -123,13 +127,13 @@ pub fn simple_bit_pack(b: &CircuitBuilder, coeffs: &[Wire], d: u32) -> Vec<Wire>
 /// encoded hint (`ω + K = 61` bytes) into `K × 256` MSB-boolean hint wires, while
 /// emitting the encoding-**validity** constraints that make the circuit
 /// unsatisfiable on a malformed hint — the in-circuit analogue of the reference
-/// returning `None` (SPEC.md §4 item 1, Correction point 5).
+/// returning `None`.
 ///
 /// `words` holds the hint region packed 8-bytes-per-word little-endian (≥ 8 words,
 /// covering the 61 bytes); the first `ω` bytes are the index slots, the last `K`
 /// are the cumulative per-row cut counts. Returns `h[i][j]` for row `i ∈ [0, K)`,
 /// coefficient `j ∈ [0, 256)`: a wire whose **MSB** is `1` iff that hint bit is set
-/// (the form `select`/`assert_*` consume directly — UseHint, M4).
+/// (the form `select`/`assert_*` consume directly — UseHint).
 ///
 /// The four validity rules mirror the reference exactly:
 ///  1. **cuts non-decreasing** — `cut[i-1] ≤ cut[i]`;
@@ -141,10 +145,12 @@ pub fn simple_bit_pack(b: &CircuitBuilder, coeffs: &[Wire], d: u32) -> Vec<Wire>
 /// Every output is a pure combinational function of the public hint bytes (no
 /// hints/nondeterminism), so the only soundness obligations are these structural
 /// asserts; the hint-weight `≤ ω` bound lives entirely in rules 2–3 plus the fixed
-/// `ω` slot count (SPEC.md §2: "this — not a separate verify step — is where the
-/// hint-weight bound actually lives").
+/// `ω` slot count.
 pub fn decode_hint(b: &CircuitBuilder, words: &[Wire]) -> Vec<Vec<Wire>> {
-    assert!(words.len() >= 8, "hint region needs ≥ 8 words for its 61 bytes");
+    assert!(
+        words.len() >= 8,
+        "hint region needs ≥ 8 words for its 61 bytes"
+    );
     let byte = |g: usize| b.extract_byte(words[g / 8], (g % 8) as u32);
     let idx: Vec<Wire> = (0..OMEGA).map(byte).collect();
     let cut: Vec<Wire> = (0..K).map(|i| byte(OMEGA + i)).collect();
@@ -303,8 +309,15 @@ mod tests {
         let group = [0x00u8, 0x04, 0x20, 0xc0, 0x00, 0x04, 0x14, 0x60, 0xc0, 0x01];
         let bytes: Vec<u8> = group.iter().cycle().take(320).copied().collect();
         let want: Vec<u64> = (0..N).map(|i| (i % 8) as u64).collect();
-        assert_eq!(ref_simple_unpack(&bytes, 10), want, "reference decoder mismatch");
-        assert!(check_unpack(&bytes, 10, &want), "in-circuit decode mismatch");
+        assert_eq!(
+            ref_simple_unpack(&bytes, 10),
+            want,
+            "reference decoder mismatch"
+        );
+        assert!(
+            check_unpack(&bytes, 10, &want),
+            "in-circuit decode mismatch"
+        );
     }
 
     /// Random round trips for `d = 10` (t1), against the plain reference decoder.
@@ -338,10 +351,7 @@ mod tests {
             // equal (γ1 − x) mod q for every x in the full 20-bit range.
             let xs: Vec<u64> = (0..N).map(|_| rng.next_u64() % (1 << 20)).collect();
             let bytes = ref_simple_pack(&xs, 20);
-            let want: Vec<u64> = xs
-                .iter()
-                .map(|&x| (GAMMA1 + Q - x) % Q)
-                .collect();
+            let want: Vec<u64> = xs.iter().map(|&x| (GAMMA1 + Q - x) % Q).collect();
 
             let b = CircuitBuilder::new();
             let c = FieldConsts::new(&b);
@@ -570,6 +580,9 @@ mod tests {
         m[0] = 20;
         m[1] = 9; // 20 > 9 within the same segment
         assert!(ref_hint_unpack(&m).is_none());
-        assert!(!check_hint(&m, None), "decreasing segment indices must reject");
+        assert!(
+            !check_hint(&m, None),
+            "decreasing segment indices must reject"
+        );
     }
 }

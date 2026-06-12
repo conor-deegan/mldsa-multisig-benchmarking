@@ -1,4 +1,4 @@
-//! Rejection sampling for `ExpandA` (SPEC.md §3a, milestone M4).
+//! Rejection sampling for `ExpandA`.
 //!
 //! `Â = ExpandA(ρ)` is sampled **directly in the NTT domain** (FIPS-204 Alg. 32 /
 //! `ml-dsa/src/sampling.rs:97` `RejNTTPoly`). For each matrix entry `Â[r][s]` the
@@ -7,8 +7,8 @@
 //! `z = ((b₂ & 0x7F) << 16) | (b₁ << 8) | b₀` and keeps it iff `z < q`. The first
 //! 256 accepted candidates are the polynomial's coefficients.
 //!
-//! A circuit cannot branch on the data-dependent rejection, so — exactly as SPEC.md
-//! §3a prescribes — we mirror the reference's **fixed over-sampling**: squeeze the
+//! A circuit cannot branch on the data-dependent rejection, so — exactly as the
+//! reference does — we mirror its **fixed over-sampling**: squeeze the
 //! same 840 bytes, compute an `accept` bit per candidate, and select the first 256
 //! accepted by **witnessed routing constrained for soundness**. The routing advice
 //! (which source candidate feeds each output slot) comes from a self-populating
@@ -28,7 +28,7 @@
 //! reads all three of its values consistently, so the rank/accept assertions bite
 //! just the same.) Requiring slot `k = 255` to be filled forces ≥ 256 acceptances;
 //! the reference's astronomically-unlikely (~10⁻⁴⁴) >840-byte fallback is omitted,
-//! the one documented, corpus-unobservable divergence (SPEC.md §3a, Corrections).
+//! the one documented, corpus-unobservable divergence.
 
 #![allow(dead_code)]
 
@@ -47,7 +47,7 @@ pub const EXPAND_A_BYTES: usize = 840;
 /// Number of three-byte rejection-sampling candidates in the 840-byte buffer.
 pub const N_CANDIDATES: usize = EXPAND_A_BYTES / 3; // 280
 
-/// Self-populating advice for the ExpandA compaction (SPEC.md §3a). Given one
+/// Self-populating advice for the ExpandA compaction. Given one
 /// `accept` word (0 or 1) per candidate, it returns, for each of the 256 output
 /// slots, the index of the candidate that fills it — the `k`-th accepted candidate
 /// in input order. Slots with no corresponding acceptance are left zero (the
@@ -117,7 +117,7 @@ pub fn rej_ntt_poly(b: &CircuitBuilder, rho: &[Wire], r: u8, s: u8) -> Vec<Wire>
 
     // ── Per-candidate value z and acceptance bit ──────────────────────────────
     // z = ((b2 & 0x7F) << 16) | (b1 << 8) | b0; accept ⇔ z < q. The `icmp_ult`
-    // *is* both the rejection test and the coefficient range-check (SPEC.md §3a).
+    // *is* both the rejection test and the coefficient range-check.
     let mask7f = b.add_constant_64(0x7F);
     let mut z = Vec::with_capacity(N_CANDIDATES);
     let mut accept = Vec::with_capacity(N_CANDIDATES); // 0/1 words
@@ -195,7 +195,7 @@ pub const SIB_FIRST: usize = N - TAU; // 207
 /// per-byte acceptance probability is `≥ 208/256`; the chance that 264 candidates yield
 /// fewer than 49 acceptances is ~10⁻³⁰⁰, far below any cryptographic margin. The
 /// reference's unbounded squeeze (the `while j[0] > i` loop) is replaced by this fixed
-/// budget exactly as SPEC.md §3a prescribes for ExpandA; over-squeezed bytes are simply
+/// budget, mirroring the fixed over-sampling used for ExpandA; over-squeezed bytes are simply
 /// never consumed (the `k < τ` guard gates them), so the produced `c` is identical.
 pub const SAMPLE_IN_BALL_BYTES: usize = 272;
 

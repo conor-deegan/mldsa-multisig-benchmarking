@@ -14,8 +14,8 @@
 //!   3. COMPLETENESS — for honest N-of-M signature sets, the circuit accepts
 //!      AND a real Binius64 proof generates and verifies.
 //!
-//! HARD RULES (the agent may not edit any of these out — the loop's CLAUDE.md
-//! repeats them, and the adversary subagent checks the diff for violations):
+//! HARD RULES (do not edit any of these out to make the suite pass — they define
+//! the soundness contract this oracle enforces):
 //!   - The reference crate `ml-dsa` is read-only ground truth. Do not modify it
 //!     and do not route the circuit's decision through it at runtime.
 //!   - Corruptions are generated, not enumerated. Do not special-case, skip, or
@@ -28,7 +28,7 @@
 use policy::Policy;
 
 // ── Contract the loop must implement in the `binius-prover` crate ────────────
-// The loop defines exactly this surface (see SPEC.md §API). xcheck depends only
+// The crate defines exactly this surface. xcheck depends only
 // on it, so the circuit internals stay free to change.
 //
 //   /// Build the circuit once for a given policy and return a reusable handle.

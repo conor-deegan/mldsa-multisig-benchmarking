@@ -1,10 +1,7 @@
-//! CLI surface, mirroring `sp1-prover` so RESULTS.md columns line up (SPEC.md §1):
+//! CLI surface, mirroring `sp1-prover` so the result columns line up:
 //!
 //!   cargo run -p binius-prover --release            build + check constraints
 //!   cargo run -p binius-prover --release -- --prove  also prove + verify
-//!
-//! At M0 the in-circuit verification is not implemented yet, so this reports the
-//! milestone status honestly rather than fabricating a result.
 
 use binius_prover::{build, circuit_accepts, prove_and_verify, Case};
 use policy::Policy;

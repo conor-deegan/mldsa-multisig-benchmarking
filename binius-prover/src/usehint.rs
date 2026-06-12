@@ -1,12 +1,12 @@
-//! `Decompose` + `UseHint` gadgets (FIPS 204 Alg. 36 / 40, milestone M4 step 7).
+//! `Decompose` + `UseHint` gadgets (FIPS 204 Alg. 36 / 40).
 //!
-//! Step 7 of the in-circuit verify (SPEC.md §4) turns the recomputed `wp`
+//! Step 7 of the in-circuit verify turns the recomputed `wp`
 //! coefficients into the high-bits string `w1 = UseHint(h, wp)` that is then
 //! `Encode₄`'d and absorbed (with μ) into SHAKE256 to recompute `c̃′`. Both
 //! gadgets here mirror `ml-dsa/src/hint.rs` (`use_hint`) and
 //! `ml-dsa/src/algebra.rs` (`decompose`) coefficient-for-coefficient, so the
 //! in-circuit `w1` is bit-identical to the reference's and the differential
-//! agreement at M4 is exact.
+//! agreement is exact.
 //!
 //! ## Soundness
 //! [`decompose`] is the only place introducing a nondeterministic value — the

@@ -1,5 +1,5 @@
 //! SHAKE128 / SHAKE256 extendable-output functions, built in-crate on the
-//! Keccak-f[1600] permutation (SPEC.md §3).
+//! Keccak-f[1600] permutation.
 //!
 //! `binius_circuits` ships only a Keccak-256 gadget (Ethereum pad `0x01`, a fixed
 //! 256-bit digest, no XOF squeeze), which is unusable for ML-DSA: ML-DSA hashes

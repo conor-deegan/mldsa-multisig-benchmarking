@@ -1,4 +1,4 @@
-//! Out-of-process Binius64 prover for the `binius-prover` crate (M6).
+//! Out-of-process Binius64 prover for the `binius-prover` crate.
 //!
 //! Invocation:
 //!
@@ -56,8 +56,8 @@ fn run() -> Result<(usize, u128), String> {
     let layout = cs.value_vec_layout.clone();
 
     // Set up prover + verifier once; reused across all witness pairs.
-    let verifier = Verifier::<Suite>::setup(cs, log_inv_rate)
-        .map_err(|e| format!("verifier setup: {e}"))?;
+    let verifier =
+        Verifier::<Suite>::setup(cs, log_inv_rate).map_err(|e| format!("verifier setup: {e}"))?;
     let prover = Prover::<OptimalPackedB128, Suite>::setup(verifier.clone())
         .map_err(|e| format!("prover setup: {e}"))?;
 
@@ -67,8 +67,9 @@ fn run() -> Result<(usize, u128), String> {
     for pair in pairs.chunks(2) {
         let pub_data: ValuesData = read_deser(&pair[0])?;
         let non_pub: ValuesData = read_deser(&pair[1])?;
-        let witness = ValueVec::new_from_data(layout.clone(), pub_data.into_owned(), non_pub.into_owned())
-            .map_err(|e| format!("reconstruct witness: {e}"))?;
+        let witness =
+            ValueVec::new_from_data(layout.clone(), pub_data.into_owned(), non_pub.into_owned())
+                .map_err(|e| format!("reconstruct witness: {e}"))?;
 
         let t0 = Instant::now();
         let mut prover_transcript = ProverTranscript::new(StdChallenger::default());

@@ -3,19 +3,12 @@
 //! The crate proves the *same* statement as `sp1-prover` and
 //! `default_verifier::verify_all` — "at least `n` of the supplied ML-DSA-65
 //! signatures verify against their slot's verifying key over the message" — but
-//! as a hand-written Binius64 circuit rather than a zkVM. See SPEC.md.
+//! as a hand-written Binius64 circuit rather than a zkVM.
 //!
 //! This module pins the public contract the `tests/xcheck.rs` oracle depends on
-//! (SPEC.md §1): [`Case`], [`build`], [`circuit_accepts`], [`prove_and_verify`].
+//! [`Case`], [`build`], [`circuit_accepts`], [`prove_and_verify`].
 //! The signatures here are frozen; the circuit internals behind them are free to
-//! change as the milestones land (SPEC.md §7).
-//!
-//! ## Milestone status
-//! M0 (this scaffold) establishes the `Case` ↔ bytes plumbing, the public API,
-//! and the CLI. The in-circuit ML-DSA verification (mod-q gadgets → NTT → SHAKE →
-//! decode → single-sig verify → N-of-M) is built from M1 onwards. Until the
-//! verify relation exists, [`circuit_accepts`] honestly reports that it cannot
-//! accept, so the oracle is RED by design — see the `TODO(stub)` markers.
+//! change.
 
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -23,34 +16,34 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 
-/// Mod-q field arithmetic gadgets (SPEC.md §2), the foundation every later layer
+/// Mod-q field arithmetic gadgets, the foundation every later layer
 /// (NTT, decode, verify) builds on. Internal for now; the public contract below is
 /// unchanged.
 mod field;
 
-/// In-circuit NTT over `R_q` (SPEC.md §2), built on the [`field`] gadgets. The
-/// polynomial-multiplication layer the verify relation (M4) uses for `Â·ẑ`, `ĉ·t̂`.
+/// In-circuit NTT over `R_q`, built on the [`field`] gadgets. The
+/// polynomial-multiplication layer the verify relation uses for `Â·ẑ`, `ĉ·t̂`.
 mod ntt;
 
-/// SHAKE128/SHAKE256 XOFs (SPEC.md §3) built on the upstream Keccak-f[1600]
+/// SHAKE128/SHAKE256 XOFs built on the upstream Keccak-f[1600]
 /// permutation — the hashing layer ExpandA, SampleInBall, μ/tr and c̃′ all use.
 mod shake;
 
-/// Byte ↔ coefficient decode/encode (SPEC.md §2): `t1`/`z` unpack into coefficient
+/// Byte ↔ coefficient decode/encode: `t1`/`z` unpack into coefficient
 /// wires and `w1` re-encode, bridging the packed `inout` bytes to the field layer.
 mod decode;
 
-/// `Decompose` + `UseHint` (SPEC.md §4 step 7) on the [`field`] gadgets — turning
+/// `Decompose` + `UseHint` on the [`field`] gadgets — turning
 /// the recomputed `wp` coefficients into the `w1` high-bits string for `c̃′`.
 mod usehint;
 
-/// Rejection sampling for `Â = ExpandA(ρ)` (SPEC.md §3a) — fixed 840-byte SHAKE128
+/// Rejection sampling for `Â = ExpandA(ρ)` — fixed 840-byte SHAKE128
 /// squeeze plus a soundly-constrained witnessed compaction of the accepted
 /// candidates into the 256 NTT-domain coefficients.
 mod sampling;
 
-/// The §4 single-signature `raw_verify_mu` relation (M4): composes every gadget
-/// above into the recomputed `c̃′`, which the N-of-M layer (M5) couples to the
+/// The single-signature `raw_verify_mu` relation: composes every gadget
+/// above into the recomputed `c̃′`, which the N-of-M layer couples to the
 /// decoded `c̃` per signature.
 mod verify;
 
@@ -226,12 +219,12 @@ fn flip_bit(bytes: &mut [u8], rng: &mut impl RngCore) {
 
 /// A circuit built for a fixed policy, reusable across many witnesses.
 ///
-/// It owns ONE compiled single-signature verify circuit ([`SingleSig`], SPEC.md §4)
-/// and the policy. The N-of-M decision (SPEC.md §5) is the host-side aggregation in
+/// It owns ONE compiled single-signature verify circuit ([`SingleSig`])
+/// and the policy. The N-of-M decision is the host-side aggregation in
 /// [`circuit_accepts`]: populate the same circuit once per signature slot and accept
 /// iff at least `n` of them satisfy — mirroring
 /// `default_verifier::verify_all`'s "count of verifying pairs `≥ n`". Reusing a
-/// single sub-circuit keeps peak build memory at ~3 GB regardless of `n` (NOTES).
+/// single sub-circuit keeps peak build memory at ~3 GB regardless of `n`.
 pub struct Circuit {
     policy: Policy,
     single: SingleSig,
@@ -321,8 +314,8 @@ fn slot_verifies(single: &SingleSig, vk: &[u8], msg: &[u8], sig: &[u8]) -> bool 
 /// Errors surfaced by [`circuit_accepts`] / [`prove_and_verify`].
 #[derive(Debug)]
 pub enum CircuitError {
-    /// The in-circuit verification logic is not yet implemented (pre-M4). This is
-    /// a milestone placeholder, never a "reject" decision about an input.
+    /// The in-circuit verification logic is not yet implemented. This is a
+    /// placeholder, never a "reject" decision about an input.
     Unimplemented(&'static str),
     /// The witness did not satisfy the circuit's constraints — i.e. the circuit
     /// *rejected* this input. Carries the failing assertion messages.
@@ -348,7 +341,7 @@ impl std::error::Error for CircuitError {}
 /// only (no proof). Returns `Ok(())` iff the wires satisfy the circuit, and
 /// MUST return `Err` for any input the reference rejects.
 pub fn circuit_accepts(circuit: &Circuit, case: &Case) -> Result<(), CircuitError> {
-    // N-of-M (SPEC.md §5): mirror `default_verifier::verify_all` — pair each supplied
+    // N-of-M: mirror `default_verifier::verify_all` — pair each supplied
     // signature with its slot's key, count how many verify, accept iff at least `n`
     // do. Each pair is decided ENTIRELY in-circuit by `slot_verifies` (decode validity
     // + c̃′ == c̃); the reference is never consulted.
@@ -388,7 +381,7 @@ pub fn circuit_accepts(circuit: &Circuit, case: &Case) -> Result<(), CircuitErro
     }
 }
 
-/// Proof-generation metrics, mirrored against the `sp1-prover` RESULTS.md columns.
+/// Proof-generation metrics, mirrored against the `sp1-prover` result columns.
 #[derive(Debug, Clone)]
 pub struct ProofStats {
     pub n_bitand: usize,
@@ -508,7 +501,7 @@ fn build_runner() -> Result<PathBuf, CircuitError> {
 /// it; return proof metrics. Only ever called by the oracle on honest cases that
 /// [`circuit_accepts`] already passed.
 ///
-/// The N-of-M statement is the AND of `n` single-signature checks (NOTES; SPEC.md §5),
+/// The N-of-M statement is the AND of `n` single-signature checks,
 /// so an honest case is proved by proving each of its `n` slots against the shared
 /// single-sig circuit and verifying every proof. Proving runs in the
 /// `binius-proof-runner` subprocess (which owns the upstream prover); one invocation
@@ -535,12 +528,8 @@ pub fn prove_and_verify(circuit: &Circuit, case: &Case) -> Result<ProofStats, Ci
     let mut witness_words_total = 0usize;
     let mut witness_paths: Vec<(PathBuf, PathBuf)> = Vec::with_capacity(n);
     for i in 0..n {
-        let (pub_path, nonpub_path, witness_words) = write_slot_witness(
-            single,
-            &case.key_bytes[i],
-            &case.msg,
-            &case.sig_bytes[i],
-        )?;
+        let (pub_path, nonpub_path, witness_words) =
+            write_slot_witness(single, &case.key_bytes[i], &case.msg, &case.sig_bytes[i])?;
         witness_words_total += witness_words;
         witness_paths.push((pub_path, nonpub_path));
     }
@@ -598,12 +587,12 @@ pub fn prove_and_verify(circuit: &Circuit, case: &Case) -> Result<ProofStats, Ci
 }
 
 #[cfg(test)]
-mod m6_tests {
+mod prove_tests {
     use super::*;
     use policy::Policy;
     use rand::{rngs::StdRng, RngCore, SeedableRng};
 
-    /// End-to-end smoke test of the M6 subprocess proving path on the cheapest policy:
+    /// End-to-end smoke test of the subprocess proving path on the cheapest policy:
     /// build → honest sign → `circuit_accepts` → `prove_and_verify` round-trips a real
     /// Binius64 proof. Fast enough to validate the plumbing without the full oracle.
     #[test]

@@ -5,24 +5,13 @@ edition = "2021"
 
 [dependencies]
 # Binius64 frontend + gadget library, pinned to a fixed rev so the autonomous
-# loop's repeated builds are reproducible and immune to upstream API churn.
-# The repo migrated IrreducibleOSS -> binius-zk (the old URL still redirects);
 # it is not published to crates.io, so it must be a git dependency.
 binius-frontend = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
 binius-circuits = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
 binius-core     = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
-
-# Proving/verifying (M6). The upstream prover crate is ALSO named `binius-prover`;
-# putting it (even transitively) in this crate's dependency closure makes the frozen
-# oracle command `cargo test -p binius-prover` ambiguous (two packages named
-# `binius-prover`). So proving is delegated to the workspace-EXCLUDED `binius-proof-
-# runner` binary (it owns the upstream prover/verifier), driven as a subprocess by
-# `prove_and_verify` over serialized constraint-system + witness files. This crate
-# therefore needs only the serialization traits, not the prover. See SPEC.md §8.6.
 binius-utils = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
 
-# The public API (`Case`, `build(&Policy)`) names these types, so they are
-# library dependencies, not just dev-dependencies.
+
 policy = { path = "../policy" }
 signing = { path = "../signing" }
 ml-dsa = { workspace = true }
