@@ -32,6 +32,10 @@ mod ntt;
 /// permutation — the hashing layer ExpandA, SampleInBall, μ/tr and c̃′ all use.
 mod shake;
 
+/// Byte ↔ coefficient decode/encode (SPEC.md §2): `t1`/`z` unpack into coefficient
+/// wires and `w1` re-encode, bridging the packed `inout` bytes to the field layer.
+mod decode;
+
 use ml_dsa::{KeyInit, MlDsa65, Seed, Signature, Signer, SigningKey, VerifyingKey};
 use policy::Policy;
 use rand::RngCore;

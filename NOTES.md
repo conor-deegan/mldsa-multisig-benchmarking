@@ -64,3 +64,19 @@ One line per increment: what changed + current oracle status. Newest at the bott
   sizes, a wrong-output rejection, and a SHAKE128≠SHAKE256 separation. 17/17 lib
   tests pass. Oracle still RED by design (circuit_accepts is the M0 TODO(stub)).
   Next: M3b byte↔coeff decode (t1 Encode<10>, z BitUnpack<20>, c̃, h, w1 Encode<4>).
+- M3b decode: added `src/decode.rs` (private `mod decode`) — the byte↔coefficient
+  bridge. `extract_field` carves a compile-time-positioned `d`-bit little-endian
+  field from the 8-bytes/word packed `inout` wires (constant `shr`/`shl`/`bor`/
+  `band`, spanning ≤2 words since d≤20). `simple_bit_unpack(d)` → 256 coeff wires
+  for t1 (d=10, mask pins [0,2¹⁰)<q canonical); `bit_unpack_gamma1` for z (d=20,
+  centred value γ1−x via `sub_mod_q`, no ‖z‖∞ check per SPEC §4 — c̃ equality
+  subsumes it); `simple_bit_pack(d=4)` re-encodes w1 → 16 words for the c̃′ absorb.
+  All pure combinational (no hints/nondeterminism), so no new range-checks. 5
+  property tests green: FIPS-204 Alg-16 known-answer (ml-dsa's own d=10 vector
+  0,1..7), random t1 round-trips vs a plain-Rust reference decoder, wrong-output
+  rejection, z centring vs (γ1−x) mod q over the full 20-bit range, and w1 encode
+  vs reference at word granularity. 22/22 lib tests pass. Oracle still RED by
+  design (circuit_accepts is the M0 TODO(stub); M3b is internal gadgets only).
+  Next: M3c hint decode (h: ω-index + K-cut → K×256 hint bits, with bit_unpack
+  validity constraints: cuts non-decreasing, max ≤ ω, post-cut zero, per-segment
+  strictly increasing) — the last decode piece before M4 single-sig verify.
