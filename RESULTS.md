@@ -1,3 +1,24 @@
+# Results — N-of-M ML-DSA-65 multisig proving
+
+Proving the SAME 6-of-10 ML-DSA-65 statement two ways: inside the **SP1 zkVM** (proving
+execution of `verify_all`) and as a hand-written **Binius64 circuit**. All numbers here are
+indicative / machine-relative, not deployable costs.
+
+## Overview - 6-of-10
+
+| Prover | Hardware | Prove time | Verify time | Proof size |
+|--------|----------|-----------:|------------:|-----------:|
+| SP1 zkVM (core)  | M5 (CPU)  | 119.95 s   | 116 ms | 5.89 MB     |
+| SP1 zkVM (core)  | A10 (GPU) | 5.70 s     | 462 ms | 7.34 MB     |
+| Binius64 circuit | M5 (CPU)  | **3.92 s** | 531 ms | **2.54 MB** |
+
+- **Prove time**: the Binius circuit on CPU proves the 6-of-10 statement ~**30× faster** than SP1 on the same M5 CPU, and ~**1.5× faster** than SP1 on an A10 GPU.
+- **Proof size**: Binius has proof of the three (2.54 MB vs SP1's 5.89 MB on CPU / 7.34 MB on GPU).
+- **Verify time** trade-off: Binius verify (531 ms) is slower than SP1-CPU verify (116 ms), in the same ballpark as SP1-GPU verify (462 ms). All three are sub-second.
+- **Apples to Oranges** — SP1 proves *execution* of `verify_all` (measured in portable RISC-V cycles); Binius proves a *hand-written circuit* (measured in AND/MUL constraints). Those two "work" metrics aren't comparable, but prove time / verify time / proof size are. SP1 is core mode (no Groth16 wrap); Binius64 commits with SHA-256.
+
+Per-system detail: [SP1](#sp1-results) · [Binius64](#binius64-results).
+
 # SP1 Results
 
 Execute-mode cycle counts for a 6-of-10 ML-DSA-65 proof inside SP1. All three configurations verified successfully in the zkVM (`all valid: true`). Cycles are the portable, host-independent metric.
@@ -128,3 +149,39 @@ Same binary, same statement, same inputs. Only the prover backend differs (`SP1_
 1. **Cycles are identical** - execute is deterministic and host-independent, so the GPU is a drop-in prover doing the exact same work.
 2. **Prove time ~21× faster** is the whole point of the GPU, and the only metric it targets.
 3. **Bigger proof + slower verify are not a regression.** Cycle counts match, so it isn't extra work, the CUDA prover just shards differently and emits a larger proof. Verify runs CPU-side (on this box's vCPUs, weaker per-core than the M5) and scales with proof structure, so a +25% proof verifies ~4× slower. If needed a small, fast-to-verify proof is needed we could look at compression/Groth16 wrapping and not core mode but this may impact PQ-ness.
+
+# Binius64 Results
+
+A hand-written Binius64 circuit proving the SAME 6-of-10 ML-DSA-65 statement as the SP1 guest
+(decode → single-signature `raw_verify_mu` → N-of-M threshold), rather than executing it inside
+a zkVM. Run on the same machine as the SP1 CPU numbers (Apple M5, 32 GB; see the device specs
+above). Indicative / MacBook-relative.
+
+Command:
+
+```sh
+RUSTFLAGS="-C target-cpu=native" cargo run -p binius-prover --release -- --prove
+```
+
+### 6-of-10 measurement
+
+| Metric | Value |
+|--------|------:|
+| Prove time  | 3921 ms |
+| Verify time | 531 ms |
+| Proof size  | 2537472 B (2.54 MB) |
+| AND constraints (`n_bitand`, per single-sig slot) | 3169091 |
+| MUL constraints (`n_intmul`, per single-sig slot) | 59904 |
+| Witness words (summed over 6 slots) | 25165824 |
+
+**How it's measured.** The N-of-M statement is the AND of `n` single-signature verifies. The
+circuit compiles ONE single-signature sub-circuit and proves each of the 6 slots against it, so
+**prove time, verify time and proof size are sums over the 6 slots**, while the **constraint
+counts are per single-sig slot** (identical for each). The proof system is Binius64 over the
+SHA-256 (`StdHashSuite`) Merkle commitment with `log_inv_rate = 1`.
+
+**Caveats.**
+
+1. **No RISC-V cycles**: this is a circuit, not a zkVM, so there's no portable cycle count. The analogous "size of the computation" metric is the AND/MUL constraint counts above (~3.17M AND + ~60k MUL per single-sig slot).
+2. **Prove time is wall-clock and varies run-to-run** (~3.6–3.9 s observed across runs); treat it as indicative, exactly like the SP1 prove times.
+3. **CPU only so far**: there's no GPU/accelerated Binius backend benchmarked here, unlike the SP1 A10 run. The top results already shows the CPU circuit beating SP1's *GPU* prove time, so my guess is a GPU here would help even more(?).

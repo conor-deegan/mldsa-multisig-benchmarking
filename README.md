@@ -12,6 +12,8 @@ View the results [here](./RESULTS.md)
 - `default-verifier` — `verify_all(policy, sigs, keys, msg)`: N-of-M threshold check that passes only if at least `policy.n` signatures are valid (fewer signers or any bad signature fails). Plus a Criterion bench.
 - `demo` — runnable binary that prints each step (policy, message, per-signer keys/signatures + sizes, verification results).
 - `sp1-prover` — proves the SAME statement in the SP1 zkVM instead of returning a bool: the guest (`sp1-prover/program`) runs the `verify_all` check, and the host produces/verifies a proof. Reports portable RISC-V cycles plus (MacBook-relative) proving time/size.
+- `binius-prover` — proves the SAME statement as a hand-written **Binius64 circuit** (not a zkVM): in-circuit ML-DSA-65 verification (mod-q gadgets → NTT → SHAKE → decode → `raw_verify_mu` → N-of-M), cross-checked against the `ml-dsa` reference in `tests/xcheck.rs`. Reports (MacBook-relative) prove time, verify time and proof size.
+- `binius-proof-runner` — workspace-excluded helper binary that owns the upstream Binius64 prover/verifier and generates + verifies the actual proof out-of-process, keeping the upstream `binius-prover` crate out of this crate's dependency closure.
 
 ## Usage
 
@@ -90,3 +92,25 @@ SP1_PROVER=cuda cargo run -p sp1-prover@0.1.0 --release --features cuda -- --pro
 Remember the cycle/opcode/keccak numbers won't change (that's the point — same work, different prover
 hardware), so the only line worth recording from the GPU run is the new prove time to drop alongside
 the M5 numbers in RESULTS.md.
+
+### Binius prover
+
+A hand-written Binius64 circuit that proves the same N-of-M ML-DSA-65 statement as the SP1
+guest, without a zkVM. No collision with an upstream `-p` name here, so no `@0.1.0` qualifier
+is needed (unlike `sp1-prover`).
+
+```sh
+cargo run  -p binius-prover --release                                            # build + check the honest witness satisfies the circuit (fast)
+RUSTFLAGS="-C target-cpu=native" cargo run -p binius-prover --release -- --prove  # also generate + verify a real Binius64 proof
+cargo test -p binius-prover                                                       # xcheck: soundness + differential + round-trip
+```
+
+Without `--prove` it just builds the circuit and checks that the honest 6-of-10 witness
+satisfies it. With `--prove` it generates and verifies a real proof through the
+`binius-proof-runner` subprocess and prints **proof size, prove time and verify time**.
+`RUSTFLAGS="-C target-cpu=native"` is optional but recommended - it meaningfully speeds up
+the field arithmetic and Keccak. It is what the benchmark numbers were taken with.
+
+Metrics: **proof size, prove time and verify time are machine-relative**, indicative only.
+Unlike SP1 there are no portable RISC-V cycles (this is a circuit, not a zkVM); the analogous
+size metric is the circuit's AND / MUL constraint counts, which `--prove` also prints.
