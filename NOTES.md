@@ -101,3 +101,20 @@ One line per increment: what changed + current oracle status. Newest at the bott
   is the M0 TODO(stub); M3c is internal gadgets only). M3 decode complete (t1/z/c̃/
   h/w1). Next: M4 single-sig verify — SampleInBall + ExpandA rejection sampling
   (§3a fixed over-sampling) then the §4 verify chain wiring decode→NTT→UseHint→c̃′.
+- M4 Decompose/UseHint: added `src/usehint.rs` (private `mod usehint`) — the §4
+  step-7 high-bits gadget. `decompose` (FIPS-204 Alg-36) advises (q1,rem) for
+  r=q1·2γ2+rem via `biguint_divide_hint`, pins the integer identity (qg_hi==0 +
+  no-wrap carry + assert_eq) and range-checks rem<2γ2 — the sole new
+  nondeterminism, fully forced (no q1 range-check needed: identity + reduced
+  r<q ⇒ q1≤15). Centres r0 mod q, buckets r1∈[0,16), and detects the edge
+  (diff==q-1 ⇔ r1_base==16, covering both upper-half-q1=15 and r=q-1-q1=16) wrapping
+  r1→0 and r0-=1 via sub_mod_q (the 0→q-1 wrap at r=q-1). `use_hint` (Alg-40) takes
+  an MSB-bool hint bit, does ±1 mod 16 via band-15 and the r0_positive=(r0≠0 &
+  r0≤γ2) select. 6 property tests green vs an independent FIPS-204 reference
+  (random + edge/boundary sweeps for both decompose and use_hint, wrong-output
+  rejections). circuit-adversary exhaustively model-checked all 8.38M r values:
+  SOUND verdict, 0 mismatches; its only note is the documented r<q precondition the
+  M4 caller must honour (wp is a reduce_mod_q output, so satisfied). 32/32 lib tests
+  pass. Oracle still RED by design (circuit_accepts is the M0 TODO(stub); usehint is
+  internal gadgets only). Next: M4 SampleInBall + ExpandA rejection sampling (§3a
+  fixed over-sampling with witnessed routing), then wire the §4 verify chain.

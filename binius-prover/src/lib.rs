@@ -36,6 +36,10 @@ mod shake;
 /// wires and `w1` re-encode, bridging the packed `inout` bytes to the field layer.
 mod decode;
 
+/// `Decompose` + `UseHint` (SPEC.md §4 step 7) on the [`field`] gadgets — turning
+/// the recomputed `wp` coefficients into the `w1` high-bits string for `c̃′`.
+mod usehint;
+
 use ml_dsa::{KeyInit, MlDsa65, Seed, Signature, Signer, SigningKey, VerifyingKey};
 use policy::Policy;
 use rand::RngCore;
