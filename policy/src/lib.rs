@@ -1,3 +1,4 @@
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Policy {
     pub n: usize,
     pub m: usize,

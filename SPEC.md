@@ -253,7 +253,7 @@ M0 scaffold+CLI · M1 mod-q gadgets (property-tested) · M2 R_q poly mult · M3 
 ## 8. Corrections vs original draft (verified 2026-06-12, binius64 @ 8f21b34)
 The §2–§4 blanks were filled against primary sources (binius64 `main`
 `binius-zk/binius64` rev `8f21b348fe8e8327b63ffa06884bf1783d40635f`, and the local
-`ml-dsa` crate). Four points correct or qualify the original draft:
+`ml-dsa` crate). Five points correct or qualify the original draft:
 1. **No SHAKE gadget exists.** `binius_circuits` ships only a Keccak-256 gadget
    (Ethereum pad `0x01`, fixed 256-bit digest, no XOF). SHAKE128/256 must be built
    in-crate on `keccak::permutation::Permutation::keccak_f1600` with the XOF pad `0x1F`
@@ -272,3 +272,29 @@ The §2–§4 blanks were filled against primary sources (binius64 `main`
    **not** add a key-distinctness constraint in M5, or honest cases with repeated keys
    could diverge from the reference. The threshold to match is exactly
    `valid_count >= policy.n` over those positional pairs.
+5. **`Signature::decode` (`lib.rs:115`) DOES enforce the `‖z‖∞ < γ1−β` bound and
+   hint-encoding validity** — returning `None` on violation — and decode sits on the
+   oracle's reference path (it runs inside `Case::parse`, before `verify_all`). This
+   refines point 2: `raw_verify_mu` itself checks only c̃ equality, but a signature that
+   fails the norm/hint checks never reaches it — it is dropped as invalid, dragging the
+   validity count below `n`. Consequences the milestones must honour: (a) `Case::parse`
+   drops non-decodable signatures (modelling "invalid"), so a single corrupting bit-flip
+   in `z`/`h` reduces the count and the reference rejects; (b) the circuit need NOT add an
+   explicit norm check — a corrupted `z` changes `c̃′`, so the §4 c̃-equality test
+   differentially subsumes the norm rejection for the corpus — but it MUST emit the
+   §4-item-1 hint-decode validity constraints, which are the in-circuit analogue of
+   `Hint::bit_unpack` returning `None`. Honest signatures always satisfy both bounds, so
+   parse never drops them. (Soundness caveat unchanged: omitting the norm check is the
+   one documented, corpus-unobservable deviation; a maliciously crafted high-norm `z`
+   hashing to the right c̃ is infeasible, not impossible.)
+
+### Oracle behaviour during intermediate milestones (M0–M3)
+While `circuit_accepts` is incomplete it rejects every case, so the oracle reports
+COMPLETENESS failures (honest cases) AND spurious DIFFERENTIAL failures of the form
+`circuit=false reference=true`. The latter are NOT corruption-strategy bugs: they are
+corrupted cases the reference legitimately *accepts* — a bit flipped in an UNUSED key
+slot `n..m` (which the positional zip never inspects, point 4), or a `swap_two_signatures`
+on a policy with `n < 2` (a no-op). A correct circuit must ACCEPT exactly these, so they
+vanish once verification lands at M4/M5. Do not "fix" them by narrowing the corruption
+helpers (that would be gaming the frozen oracle); the helpers correctly flip across all
+`m` keys and all `n` slots.

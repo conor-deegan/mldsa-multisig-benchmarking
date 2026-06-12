@@ -17,9 +17,13 @@ binius-core     = { git = "https://github.com/binius-zk/binius64", rev = "8f21b3
 #   binius64-prover   = { git = "...", rev = "...", package = "binius-prover" }
 #   binius64-verifier = { git = "...", rev = "...", package = "binius-verifier" }
 
-[dev-dependencies]
+# The public API (`Case`, `build(&Policy)`) names these types, so they are
+# library dependencies, not just dev-dependencies.
 policy = { path = "../policy" }
 signing = { path = "../signing" }
-default-verifier = { path = "../default-verifier" }
 ml-dsa = { workspace = true }
 rand = "0.8"
+
+[dev-dependencies]
+# The xcheck oracle calls the reference verifier directly; the circuit never does.
+default-verifier = { path = "../default-verifier" }

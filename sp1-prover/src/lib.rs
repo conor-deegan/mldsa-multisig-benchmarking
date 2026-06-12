@@ -9,7 +9,7 @@ pub const GUEST_ELF: Elf = include_elf!("sp1-prover-program");
 /// bytes, and the message. If `tamper`, flip one byte of the first signature so
 /// the in-guest verification must fail.
 pub fn build_stdin(policy: &Policy, tamper: bool) -> SP1Stdin {
-    let (sigs, keys, msg) = signing::sign(policy);
+    let (sigs, keys, msg) = signing::sign_default(policy);
     let mut sig_bytes: Vec<Vec<u8>> = sigs.iter().map(|s| s.encode().to_vec()).collect();
     let key_bytes: Vec<Vec<u8>> = keys.iter().map(|k| k.encode().to_vec()).collect();
     if tamper {

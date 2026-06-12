@@ -13,3 +13,17 @@ One line per increment: what changed + current oracle status. Newest at the bott
   §8 Corrections (no norm/weight checks, no key-distinctness in verify_all). No circuit
   code written. Oracle RED (expected): xcheck does not compile until M0 implements
   build/circuit_accepts/prove_and_verify/Case. Next: M0 scaffold + CLI.
+- M0 scaffold: implemented the frozen xcheck contract. `policy::Policy` now derives
+  Clone/Debug/Eq; `signing::sign` reshaped to `sign(&Policy,&[u8],&mut impl RngCore)
+  -> Signed{keys(m),sigs(n)}` for the oracle, old fixed-seed behaviour preserved as
+  `sign_default` (callers in default-verifier/demo/sp1-prover/benches updated). Added
+  real `Case` (byte-level artifact) with parse() + all 6 corruption helpers; parse
+  drops non-decodable sigs (= invalid). `build`/`circuit_accepts`/`prove_and_verify`/
+  `ProofStats`/`CircuitError` + CLI (src/main.rs) in place; circuit_accepts is a
+  marked TODO(stub) returning Unimplemented (no fake green). Moved policy/signing/
+  ml-dsa/rand to lib deps (Case names their types). Toolchain installed (rust 1.96).
+  Build green; default-verifier tests + demo build green. Oracle RED as designed:
+  COMPLETENESS fails (stub rejects honest) + spurious DIFFERENTIAL on reference-accepts
+  corruptions (unused-key flips / n<2 swaps — resolve at M4/M5, see SPEC §8.5). Added
+  SPEC §8.5 (Signature::decode enforces ‖z‖∞/hint validity; M0–M3 oracle behaviour).
+  Next: M1 mod-q gadgets (mul_mod_q/add_mod_q/sub_mod_q) with internal property tests.

@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 ml-dsa = { workspace = true }
 policy = { path = "../policy" }
+rand = "0.8"

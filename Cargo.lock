@@ -3881,6 +3881,7 @@ version = "0.1.0"
 dependencies = [
  "ml-dsa",
  "policy",
+ "rand 0.8.6",
 ]
 
 [[package]]
