@@ -40,6 +40,11 @@ mod decode;
 /// the recomputed `wp` coefficients into the `w1` high-bits string for `c̃′`.
 mod usehint;
 
+/// Rejection sampling for `Â = ExpandA(ρ)` (SPEC.md §3a) — fixed 840-byte SHAKE128
+/// squeeze plus a soundly-constrained witnessed compaction of the accepted
+/// candidates into the 256 NTT-domain coefficients.
+mod sampling;
+
 use ml_dsa::{KeyInit, MlDsa65, Seed, Signature, Signer, SigningKey, VerifyingKey};
 use policy::Policy;
 use rand::RngCore;

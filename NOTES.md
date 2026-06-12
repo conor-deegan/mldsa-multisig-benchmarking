@@ -118,3 +118,24 @@ One line per increment: what changed + current oracle status. Newest at the bott
   pass. Oracle still RED by design (circuit_accepts is the M0 TODO(stub); usehint is
   internal gadgets only). Next: M4 SampleInBall + ExpandA rejection sampling (§3a
   fixed over-sampling with witnessed routing), then wire the §4 verify chain.
+- M4 ExpandA sampling: added `src/sampling.rs` (private `mod sampling`) — `rej_ntt_poly`
+  (FIPS-204 Alg-30 / RejNTTPoly), the NTT-domain `Â[r][s]`. Absorbs `ρ ∥ s ∥ r` into
+  SHAKE128 (5th input word = `s | r<<8`), squeezes the fixed 840 B (5 blocks =
+  280 three-byte candidates), computes per-candidate `z=((b2&0x7F)<<16)|(b1<<8)|b0`
+  and `accept = select(icmp_ult(z,q),1,0)` (the icmp IS both the rejection test and
+  the coeff range-check; select canonicalises the MSB-bool to a tight 0/1). Compaction
+  via sound witnessed routing: a self-populating custom `ExpandACompactionHint` advises
+  `src[k]`; the gadget reads `[accept, rank, z]` (rank = exclusive prefix sum of accept)
+  from candidate `src[k]` through one `multi_wire_multiplex`, asserts `accept==1 ∧
+  rank==k` — since rank strictly increases at accepted candidates this pins `src[k]` to
+  the unique k-th accepted candidate, zero prover freedom (out-of-range src still lands
+  on a real candidate, so the asserts bite identically). The `rank==255` slot forces
+  ≥256 acceptances; the ~10⁻⁴⁴ >840B fallback is the documented omission. The hint is
+  the only new nondeterminism and is fully re-pinned by constraints (no range-check
+  needed). 3 property tests green vs an independent sha3-driven reference (random ρ/r/s
+  round-trip, s-vs-r absorb-order separation, wrong-output rejection). circuit-adversary
+  red-teamed all routing/forge/desync/byte-index/packing surfaces incl. a standalone
+  280-leaf mux model: verdict SOUND. 35/35 lib tests pass. Oracle still RED by design
+  (circuit_accepts is the M0 TODO(stub); sampling is an internal gadget). Next: M4
+  SampleInBall (stateful ±1 shuffle via running-threshold scan), then wire the §4
+  verify chain (decode→NTT→ExpandA→pointwise→NTT⁻¹→UseHint→w1→c̃′ equality).
