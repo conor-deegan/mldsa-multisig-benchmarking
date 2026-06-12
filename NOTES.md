@@ -27,3 +27,15 @@ One line per increment: what changed + current oracle status. Newest at the bott
   corruptions (unused-key flips / n<2 swaps — resolve at M4/M5, see SPEC §8.5). Added
   SPEC §8.5 (Signature::decode enforces ‖z‖∞/hint validity; M0–M3 oracle behaviour).
   Next: M1 mod-q gadgets (mul_mod_q/add_mod_q/sub_mod_q) with internal property tests.
+- M1 mod-q gadgets: added `src/field.rs` (private `mod field`) with `FieldConsts`,
+  `mul_mod_q` (imul + divmod-hint + in-circuit k·q+r==p with no-wrap carry check +
+  r<q range-check), `reduce_mod_q` (lazy-reduction-capable, any p<2⁶⁴), `add_mod_q`
+  /`sub_mod_q` (deterministic conditional subtract). 8 internal property tests green
+  (2000 random + edge cases each, a negative output-coupling control, and a
+  large-accumulator reduce test up to u64::MAX). circuit-adversary red-teamed it:
+  caught that the original `k<q` range-check contradicted the documented multi-
+  product lazy-reduction precondition (honest k>q for p>q² ⇒ completeness break);
+  fixed by dropping k<q and instead asserting the iadd carry-out (cout MSB) is 0,
+  which pins p=k·q+r over the integers for any p<2⁶⁴ while staying sound (kq_hi==0 +
+  no-wrap + r<q uniquely force r=p mod q). Oracle still RED by design (circuit_accepts
+  remains the M0 TODO(stub); M1 is internal gadgets only). Next: M2 R_q NTT.

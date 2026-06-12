@@ -19,6 +19,11 @@
 
 use std::fmt;
 
+/// Mod-q field arithmetic gadgets (SPEC.md §2), the foundation every later layer
+/// (NTT, decode, verify) builds on. Internal for now; the public contract below is
+/// unchanged.
+mod field;
+
 use ml_dsa::{KeyInit, MlDsa65, Seed, Signature, Signer, SigningKey, VerifyingKey};
 use policy::Policy;
 use rand::RngCore;
