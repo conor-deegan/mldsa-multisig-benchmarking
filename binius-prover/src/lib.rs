@@ -28,6 +28,10 @@ mod field;
 /// polynomial-multiplication layer the verify relation (M4) uses for `Â·ẑ`, `ĉ·t̂`.
 mod ntt;
 
+/// SHAKE128/SHAKE256 XOFs (SPEC.md §3) built on the upstream Keccak-f[1600]
+/// permutation — the hashing layer ExpandA, SampleInBall, μ/tr and c̃′ all use.
+mod shake;
+
 use ml_dsa::{KeyInit, MlDsa65, Seed, Signature, Signer, SigningKey, VerifyingKey};
 use policy::Policy;
 use rand::RngCore;

@@ -27,3 +27,6 @@ rand = "0.8"
 [dev-dependencies]
 # The xcheck oracle calls the reference verifier directly; the circuit never does.
 default-verifier = { path = "../default-verifier" }
+# SHAKE128/256 reference for the in-crate sponge's property tests (same crate and
+# version the `ml-dsa` reference hashes with, so the XOF semantics match exactly).
+sha3 = { version = "0.11", default-features = false }
