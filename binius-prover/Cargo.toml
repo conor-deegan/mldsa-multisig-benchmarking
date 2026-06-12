@@ -1,0 +1,25 @@
+[package]
+name = "binius-prover"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Binius64 frontend + gadget library, pinned to a fixed rev so the autonomous
+# loop's repeated builds are reproducible and immune to upstream API churn.
+# The repo migrated IrreducibleOSS -> binius-zk (the old URL still redirects);
+# it is not published to crates.io, so it must be a git dependency.
+binius-frontend = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
+binius-circuits = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
+binius-core     = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
+
+# Proving/verifying (added at M6). NOTE: the upstream prover crate is also named
+# `binius-prover`, which clashes with this crate's name, so it must be aliased:
+#   binius64-prover   = { git = "...", rev = "...", package = "binius-prover" }
+#   binius64-verifier = { git = "...", rev = "...", package = "binius-verifier" }
+
+[dev-dependencies]
+policy = { path = "../policy" }
+signing = { path = "../signing" }
+default-verifier = { path = "../default-verifier" }
+ml-dsa = { workspace = true }
+rand = "0.8"
