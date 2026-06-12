@@ -14,7 +14,7 @@ fn main() {
         policy.n, policy.m, policy.n, policy.m
     );
 
-    let (mut sigs, keys, msg) = signing::sign(&policy);
+    let (mut sigs, keys, msg) = signing::sign_default(&policy);
     println!(
         "Message: {:?} ({} bytes)",
         String::from_utf8_lossy(&msg),

@@ -1,0 +1,25 @@
+[package]
+name = "binius-prover"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Binius64 frontend + gadget library, pinned to a fixed rev so the autonomous
+# it is not published to crates.io, so it must be a git dependency.
+binius-frontend = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
+binius-circuits = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
+binius-core     = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
+binius-utils = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
+
+
+policy = { path = "../policy" }
+signing = { path = "../signing" }
+ml-dsa = { workspace = true }
+rand = "0.8"
+
+[dev-dependencies]
+# The xcheck oracle calls the reference verifier directly; the circuit never does.
+default-verifier = { path = "../default-verifier" }
+# SHAKE128/256 reference for the in-crate sponge's property tests (same crate and
+# version the `ml-dsa` reference hashes with, so the XOF semantics match exactly).
+sha3 = { version = "0.11", default-features = false }

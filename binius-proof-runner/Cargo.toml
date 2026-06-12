@@ -1,0 +1,22 @@
+[package]
+name = "binius-proof-runner"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[[bin]]
+name = "binius-proof-runner"
+path = "src/main.rs"
+
+[dependencies]
+# Same pinned rev as `binius-prover` so the serialized constraint-system / witness
+# wire formats match exactly across the process boundary.
+binius-core     = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
+binius-prover   = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
+binius-verifier = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
+binius-hash     = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f", features = ["rayon"] }
+binius-utils    = { git = "https://github.com/binius-zk/binius64", rev = "8f21b348fe8e8327b63ffa06884bf1783d40635f" }
+
+[profile.release]
+opt-level = 3
