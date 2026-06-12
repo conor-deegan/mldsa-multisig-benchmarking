@@ -39,3 +39,15 @@ One line per increment: what changed + current oracle status. Newest at the bott
   which pins p=k·q+r over the integers for any p<2⁶⁴ while staying sound (kq_hi==0 +
   no-wrap + r<q uniquely force r=p mod q). Oracle still RED by design (circuit_accepts
   remains the M0 TODO(stub); M1 is internal gadgets only). Next: M2 R_q NTT.
+- M2 R_q NTT: added `src/ntt.rs` (private `mod ntt`) — `zeta_pow_bitrev()` const
+  twiddle table (ζ=1753, bitrev8, matches ml-dsa/ntt.rs Appendix B), `NttConsts`
+  (256 fwd + 256 negated twiddle wires + 256⁻¹), forward `ntt` (8 CT layers 128→1,
+  m:1..256), inverse `ntt_inverse` (8 GS layers + 256⁻¹ scale), `pointwise_mul`
+  (MultiplyNTT). All butterflies compose the M1 field gadgets, so no new hints/
+  nondeterminism beyond mul_mod_q's vetted remainder range-check. 5 property tests
+  green: circuit-fwd/inverse vs an independent plain-Rust reference NTT, a wrong-
+  output rejection, and the decisive multiplication-homomorphism anchor
+  NTT⁻¹(NTT(f)∘NTT(g))==poly_mul(f,g) vs independent schoolbook negacyclic conv
+  (a bad twiddle table cannot survive it). 13/13 lib tests pass. Oracle still RED by
+  design (circuit_accepts remains the M0 TODO(stub); M2 is internal gadgets only).
+  Next: M3 hashing (SHAKE128/256 on keccak_f1600) + byte↔coeff decode (t1/z/c̃/h/w1).

@@ -24,6 +24,10 @@ use std::fmt;
 /// unchanged.
 mod field;
 
+/// In-circuit NTT over `R_q` (SPEC.md §2), built on the [`field`] gadgets. The
+/// polynomial-multiplication layer the verify relation (M4) uses for `Â·ẑ`, `ĉ·t̂`.
+mod ntt;
+
 use ml_dsa::{KeyInit, MlDsa65, Seed, Signature, Signer, SigningKey, VerifyingKey};
 use policy::Policy;
 use rand::RngCore;
