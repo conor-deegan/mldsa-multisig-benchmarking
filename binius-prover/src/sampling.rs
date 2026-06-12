@@ -32,10 +32,11 @@
 
 #![allow(dead_code)]
 
+use binius_circuits::multiplexer::single_wire_multiplex;
 use binius_core::word::Word;
 use binius_frontend::{CircuitBuilder, Hint, Wire};
 
-use crate::field::Q;
+use crate::field::{FieldConsts, Q};
 
 /// Degree of every polynomial: 256 coefficients.
 pub const N: usize = 256;
@@ -165,12 +166,122 @@ pub fn rej_ntt_poly(b: &CircuitBuilder, rho: &[Wire], r: u8, s: u8) -> Vec<Wire>
         .collect()
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SampleInBall (FIPS-204 Alg. 29 / `ml-dsa/src/sampling.rs:66`)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Number of nonzero coefficients in the challenge polynomial `c` (ML-DSA-65).
+pub const TAU: usize = 49;
+
+/// First iteration index of the shuffle: `256 − τ = 207` (the `for i in (256-τ)..256`
+/// loop in the reference).
+pub const SIB_FIRST: usize = N - TAU; // 207
+
+/// Fixed over-sampled SHAKE256 squeeze for SampleInBall: 8 sign bytes followed by the
+/// index-candidate stream. Two SHAKE256 rate blocks (272 B) overwhelmingly cover the
+/// τ = 49 acceptances — each accepted candidate clears a threshold `i ≥ 207`, so the
+/// per-byte acceptance probability is `≥ 208/256`; the chance that 264 candidates yield
+/// fewer than 49 acceptances is ~10⁻³⁰⁰, far below any cryptographic margin. The
+/// reference's unbounded squeeze (the `while j[0] > i` loop) is replaced by this fixed
+/// budget exactly as SPEC.md §3a prescribes for ExpandA; over-squeezed bytes are simply
+/// never consumed (the `k < τ` guard gates them), so the produced `c` is identical.
+pub const SAMPLE_IN_BALL_BYTES: usize = 272;
+
+/// Number of index-candidate bytes (after the 8 sign bytes).
+pub const N_INDEX_BYTES: usize = SAMPLE_IN_BALL_BYTES - 8; // 264
+
+/// `c = SampleInBall(c̃, τ = 49)` (FIPS-204 Alg. 29): the sparse challenge polynomial,
+/// 256 coefficients of which exactly τ are nonzero ∈ {−1, +1} (stored as the canonical
+/// residues `q − 1` / `1`), the rest zero.
+///
+/// `ctilde` is the 48-byte challenge hash as 6 little-endian words (the signature's
+/// first field). Returns 256 coefficient wires.
+///
+/// ### Construction (no nondeterminism, zero prover freedom)
+/// `c` is a deterministic function of `c̃`, so — like the decode gadgets — this emits
+/// only combinational/sequential gates over public-relation values and introduces no
+/// witness advice and hence no range-checks. Two data-dependent control structures in
+/// the reference are made fixed-shape:
+///
+/// 1. **Index rejection sampling.** The reference squeezes index bytes one at a time,
+///    skipping any `> i` for the current threshold `i` (which starts at 207 and rises by
+///    one per accepted sample). We squeeze the fixed [`SAMPLE_IN_BALL_BYTES`] stream and
+///    scan it once, carrying a running `(i_cur, k_cur)` state: a byte `a` is accepted iff
+///    `a ≤ i_cur ∧ k_cur < τ`, on which `i_cur` and `k_cur` both advance (the invariant
+///    `i_cur = 207 + k_cur` holds throughout, so the threshold matches the reference's
+///    `i` at every step). The accepted byte is scattered into output slot `k_cur`, giving
+///    `j[0..τ]` — the same index sequence the reference consumes. A final `k_cur == τ`
+///    assertion forces all τ acceptances to have occurred within the budget (the omitted
+///    >272-byte fallback would make the witness unsatisfiable, an event of probability
+///    ~10⁻³⁰⁰).
+///
+/// 2. **The in-place shuffle.** For iteration `t` (threshold/target index `i = 207 + t`,
+///    a compile-time constant) the reference does `c[i] = c[j]; c[j] = ±1`. With `i`
+///    constant and `j = j[t]` a wire (`≤ i`), each step reads `c[j]` via one
+///    `single_wire_multiplex` over `c[0..=i]` then rebuilds the array: position `p`
+///    becomes `±1` if `p == j` (the last write wins, also covering `j == i`), else
+///    `c[j]` if `p == i`, else unchanged. The sign for iteration `t` is bit `t` of the
+///    8 sign bytes (`bit_set(s, i + τ − 256) = bit_set(s, t)`), `−1` if set.
+pub fn sample_in_ball(b: &CircuitBuilder, c: &FieldConsts, ctilde: &[Wire]) -> Vec<Wire> {
+    assert_eq!(ctilde.len(), 6, "c̃ is 48 bytes = 6 words");
+
+    let zero = c.zero;
+    let one = b.add_constant_64(1);
+    let minus_one = b.add_constant_64(Q - 1);
+    let tau_w = b.add_constant_64(TAU as u64);
+
+    // ── SHAKE256(c̃) → 272 bytes: 8 sign bytes ∥ index-candidate stream ─────────
+    let out = crate::shake::shake256(b, ctilde, 48, SAMPLE_IN_BALL_BYTES);
+    let byte = |g: usize| b.extract_byte(out[g / 8], (g % 8) as u32);
+    // The 8 sign bytes are exactly the first output word, little-endian; bit t of it
+    // is `bit_set(s, t)`, the sign selector for iteration t.
+    let sign_word = out[0];
+
+    // ── Fixed-length scan deriving j[0..τ] with the running threshold ──────────
+    let mut j = vec![zero; TAU];
+    let mut i_cur = b.add_constant_64(SIB_FIRST as u64); // 207
+    let mut k_cur = zero;
+    for q in 0..N_INDEX_BYTES {
+        let a = byte(8 + q);
+        let accept = b.band(b.icmp_ule(a, i_cur), b.icmp_ult(k_cur, tau_w));
+        // Scatter the accepted byte into slot k_cur (the current iteration index).
+        for (t, jt) in j.iter_mut().enumerate() {
+            let hit = b.band(accept, b.icmp_eq(k_cur, b.add_constant_64(t as u64)));
+            *jt = b.select(hit, a, *jt);
+        }
+        // Advance (i_cur, k_cur) together on acceptance; both stay < 2²⁴ (no carry).
+        i_cur = b.select(accept, b.iadd(i_cur, one).0, i_cur);
+        k_cur = b.select(accept, b.iadd(k_cur, one).0, k_cur);
+    }
+    // All τ acceptances must have landed inside the fixed budget.
+    b.assert_eq("sib_count", k_cur, tau_w);
+
+    // ── The τ-step in-place shuffle, c starting all-zero ───────────────────────
+    let mut poly = vec![zero; N];
+    for t in 0..TAU {
+        let i = SIB_FIRST + t; // compile-time target index 207..255
+        let jt = j[t];
+        // Sign for iteration t: bit t of the sign word, −1 if set else +1.
+        let bit = b.band(sign_word, b.add_constant_64(1u64 << t));
+        let sign_val = b.select(b.icmp_ne(bit, zero), minus_one, one);
+        // old_at_j = poly[j]; j ≤ i, so the i+1-wide mux covers it.
+        let old_at_j = single_wire_multiplex(b, &poly[..=i], jt);
+        poly = (0..N)
+            .map(|p| {
+                let base = if p == i { old_at_j } else { poly[p] };
+                b.select(b.icmp_eq(b.add_constant_64(p as u64), jt), sign_val, base)
+            })
+            .collect();
+    }
+    poly
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use rand::{rngs::StdRng, RngCore, SeedableRng};
     use sha3::digest::{ExtendableOutput, Update, XofReader};
-    use sha3::Shake128;
+    use sha3::{Shake128, Shake256};
 
     /// Independent plain-Rust reference for `RejNTTPoly` (FIPS-204 Alg. 30), driven
     /// by the `sha3` crate — the same reference the `ml-dsa` crate wraps but which is
@@ -269,5 +380,106 @@ mod tests {
         assert!(check(&rho, 2, 3, &want));
         want[0] ^= 1;
         assert!(!check(&rho, 2, 3, &want));
+    }
+
+    // ── SampleInBall ──────────────────────────────────────────────────────────
+
+    /// Independent plain-Rust reference for `SampleInBall` (FIPS-204 Alg. 29), driven
+    /// by the `sha3` crate's SHAKE256 — re-derived here since the `ml-dsa` version is
+    /// `pub(crate)`. Returns the 256 coefficients as canonical residues (0, 1, q−1).
+    fn ref_sample_in_ball(ctilde: &[u8; 48]) -> [u64; N] {
+        let mut h = Shake256::default();
+        h.update(ctilde);
+        let mut xof = h.finalize_xof();
+        let mut s = [0u8; 8];
+        xof.read(&mut s);
+
+        let mut c = [0u64; N];
+        let mut jb = [0u8; 1];
+        for i in (N - TAU)..N {
+            loop {
+                xof.read(&mut jb);
+                if (jb[0] as usize) <= i {
+                    break;
+                }
+            }
+            let j = jb[0] as usize;
+            c[i] = c[j];
+            let idx = i + TAU - N; // = i − 207 ∈ 0..τ
+            let bit = (s[idx >> 3] >> (idx & 7)) & 1;
+            c[j] = if bit == 1 { Q - 1 } else { 1 };
+        }
+        c
+    }
+
+    /// Pack 48 c̃ bytes into 6 little-endian words.
+    fn pack_ctilde(ct: &[u8; 48]) -> [u64; 6] {
+        let mut w = [0u64; 6];
+        for (i, wi) in w.iter_mut().enumerate() {
+            *wi = u64::from_le_bytes(ct[i * 8..i * 8 + 8].try_into().unwrap());
+        }
+        w
+    }
+
+    /// Build a SampleInBall circuit, couple each coefficient output to a preloaded
+    /// `want` inout (the coupling trick), and report whether the witness populates.
+    fn check_sib(ct: &[u8; 48], expected: &[u64; N]) -> bool {
+        let b = CircuitBuilder::new();
+        let consts = FieldConsts::new(&b);
+        let ct_wires: Vec<Wire> = (0..6).map(|_| b.add_inout()).collect();
+        let out = sample_in_ball(&b, &consts, &ct_wires);
+        let want: Vec<Wire> = (0..N).map(|_| b.add_inout()).collect();
+        for (o, w) in out.iter().zip(&want) {
+            b.assert_eq("coeff_eq", *o, *w);
+        }
+        let circuit = b.build();
+
+        let mut w = circuit.new_witness_filler();
+        for (wire, val) in ct_wires.iter().zip(pack_ctilde(ct)) {
+            w[*wire] = Word::from_u64(val);
+        }
+        for (wire, val) in want.iter().zip(expected.iter()) {
+            w[*wire] = Word::from_u64(*val);
+        }
+        circuit.populate_wire_witness(&mut w).is_ok()
+    }
+
+    #[test]
+    fn sample_in_ball_matches_reference() {
+        let mut rng = StdRng::seed_from_u64(202);
+        for _ in 0..8 {
+            let mut ct = [0u8; 48];
+            rng.fill_bytes(&mut ct);
+            let want = ref_sample_in_ball(&ct);
+            // Sanity on the reference: exactly τ nonzero, all ∈ {1, q−1}.
+            let nz = want.iter().filter(|&&x| x != 0).count();
+            assert_eq!(nz, TAU, "reference must yield τ nonzero coefficients");
+            assert!(want.iter().all(|&x| x == 0 || x == 1 || x == Q - 1));
+            assert!(check_sib(&ct, &want), "sample_in_ball mismatch");
+        }
+    }
+
+    /// A wrong expected coefficient must make the witness unsatisfiable — guards the
+    /// coupling against vacuous success.
+    #[test]
+    fn sample_in_ball_rejects_wrong_output() {
+        let ct = [5u8; 48];
+        let mut want = ref_sample_in_ball(&ct);
+        assert!(check_sib(&ct, &want));
+        // Find a nonzero coefficient and corrupt it.
+        let pos = want.iter().position(|&x| x != 0).unwrap();
+        want[pos] = if want[pos] == 1 { Q - 1 } else { 1 };
+        assert!(!check_sib(&ct, &want), "sign flip must be rejected");
+    }
+
+    /// Distinct c̃ must give distinct challenge polynomials, each matching its own
+    /// reference — catches a sign/index desync.
+    #[test]
+    fn sample_in_ball_input_dependent() {
+        let a = ref_sample_in_ball(&[1u8; 48]);
+        let d = ref_sample_in_ball(&[2u8; 48]);
+        assert_ne!(a, d);
+        assert!(check_sib(&[1u8; 48], &a));
+        assert!(check_sib(&[2u8; 48], &d));
     }
 }

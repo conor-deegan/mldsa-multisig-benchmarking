@@ -139,3 +139,24 @@ One line per increment: what changed + current oracle status. Newest at the bott
   (circuit_accepts is the M0 TODO(stub); sampling is an internal gadget). Next: M4
   SampleInBall (stateful ±1 shuffle via running-threshold scan), then wire the §4
   verify chain (decode→NTT→ExpandA→pointwise→NTT⁻¹→UseHint→w1→c̃′ equality).
+- M4 SampleInBall: added `sample_in_ball` to `src/sampling.rs` (FIPS-204 Alg-29 /
+  `ml-dsa/src/sampling.rs:66`), the sparse challenge `c=SampleInBall(c̃,τ=49)`. Pure
+  deterministic over c̃ (6 words) — no hints/advice, zero prover freedom, so no new
+  range-checks (like the decode gadgets). Two data-dependent control structures made
+  fixed-shape: (1) index rejection sampling → a fixed 272 B SHAKE256 squeeze (8 sign
+  bytes ∥ 264 index candidates) scanned once with a running (i_cur,k_cur) state,
+  invariant i_cur=207+k_cur, accept⇔a≤i_cur ∧ k_cur<τ, scatter accepted byte into
+  slot k_cur, final assert k_cur==τ (omitted >272B fallback ~10⁻³⁰⁰, SPEC §3a);
+  (2) the τ-step in-place shuffle c[i]=c[j];c[j]=±1 with i a compile-time constant
+  and j=j[t]≤i a wire — one single_wire_multiplex over c[0..=i] reads old c[j], then
+  per-position rebuild (p==j wins, covering j==i; else p==i gets old c[j]; else
+  unchanged); sign = bit t of the sign word (−1=q−1 if set). 3 property tests green
+  vs an independent sha3-Shake256 reference (random round-trip + τ-nonzero/{±1}
+  sanity, sign-flip rejection, input-dependence). circuit-adversary model-checked
+  200k–3M seeds across the j==i edge, scan threshold/guard/scatter, mux range, sign
+  indexing and completeness: verdict SOUND, 0 mismatches. 38/38 lib tests pass.
+  Oracle still RED by design (circuit_accepts is the M0 TODO(stub); SampleInBall is
+  an internal gadget). All M4 sub-gadgets now exist (decode, NTT, ExpandA, UseHint,
+  SampleInBall). Next: wire the §4 single-sig verify chain in circuit_accepts —
+  decode→SampleInBall/NTT(c)→NTT(z)→ExpandA→Âẑ−ĉt̂→NTT⁻¹→UseHint→w1 encode→c̃′ via
+  μ/tr SHAKE256→c̃ equality, exposing key/sig bytes as inout/witness wires.
