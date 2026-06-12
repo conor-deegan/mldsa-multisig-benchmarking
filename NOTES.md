@@ -80,3 +80,24 @@ One line per increment: what changed + current oracle status. Newest at the bott
   Next: M3c hint decode (h: ω-index + K-cut → K×256 hint bits, with bit_unpack
   validity constraints: cuts non-decreasing, max ≤ ω, post-cut zero, per-segment
   strictly increasing) — the last decode piece before M4 single-sig verify.
+- M3c hint decode: added `decode_hint` to `src/decode.rs` — the in-circuit
+  `Hint::bit_unpack` (FIPS-204 Alg-21 / `ml-dsa/src/hint.rs:128`). Carves the
+  61-byte encoded hint (ω=55 index slots ∥ K=6 cumulative cut counts) from the
+  packed `inout` words via `extract_byte`, then emits the four encoding-validity
+  asserts that make the circuit unsatisfiable on any malformed hint the reference
+  drops with `None`: (1) cuts non-decreasing (`icmp_ule` pairs); (2) max cut ≤ ω
+  (max = cut[K-1] under rule 1); (3) index slots at/beyond max_cut forced zero
+  (`assert_eq_cond` gated on `icmp_uge`); (4) per-segment strictly increasing,
+  with the intra-segment pair predicate = (t+1 < max_cut) ∧ (t+1 not a cut value)
+  — exactly the reference's per-segment `windows(2)` check since no cut can fall
+  inside a segment interior. Output K×256 MSB-boolean wires via membership×eq OR;
+  padding zeros (t≥max_cut) belong to no row so never reach the matrix. Per SPEC §2
+  this is the sole home of the hint-weight ≤ ω bound. Pure combinational over the
+  public hint bytes — no new hints/nondeterminism, so no new range-checks beyond
+  the asserts. 4 new property tests green (known-answer, random round-trip, wrong-
+  output rejection, all five malformed classes); circuit-adversary could not break
+  it (2M+ biased-random + 135k exhaustive scaled model checks + circuit edge cases,
+  verdict SOUND). 26/26 lib tests pass. Oracle still RED by design (circuit_accepts
+  is the M0 TODO(stub); M3c is internal gadgets only). M3 decode complete (t1/z/c̃/
+  h/w1). Next: M4 single-sig verify — SampleInBall + ExpandA rejection sampling
+  (§3a fixed over-sampling) then the §4 verify chain wiring decode→NTT→UseHint→c̃′.
