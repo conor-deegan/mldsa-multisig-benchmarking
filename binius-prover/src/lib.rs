@@ -125,7 +125,10 @@ impl Case {
             .filter_map(|b| Signature::<MlDsa65>::try_from(b.as_slice()).ok())
             .collect();
         (
-            Policy { n: self.n, m: self.m },
+            Policy {
+                n: self.n,
+                m: self.m,
+            },
             self.msg.clone(),
             keys,
             sigs,
@@ -134,7 +137,10 @@ impl Case {
 
     /// The policy this case was built for.
     pub fn policy(&self) -> Policy {
-        Policy { n: self.n, m: self.m }
+        Policy {
+            n: self.n,
+            m: self.m,
+        }
     }
 
     // ── Corruption strategies (used by the oracle; each yields a case the
@@ -409,7 +415,7 @@ fn write_slot_witness(
     vk: &[u8],
     msg: &[u8],
     sig: &[u8],
-) -> Result<(PathBuf, PathBuf), CircuitError> {
+) -> Result<(PathBuf, PathBuf, usize), CircuitError> {
     let key_words = pack_le(vk);
     let msg_words = pack_le(msg);
     let sig_words = pack_le(sig);
@@ -431,6 +437,10 @@ fn write_slot_witness(
         .populate_wire_witness(&mut w)
         .map_err(|e| CircuitError::Unsatisfied(format!("{e:?}")))?;
     let witness = w.into_value_vec();
+    // Honest committed witness word count for this slot: the full committed value
+    // vector (public + non-public, excluding scratch), not the narrow declared
+    // `n_witness`. Taken before the witness is consumed by serialisation below.
+    let witness_words = witness.size();
 
     let write = |words: &[Word], tag: &str| -> Result<PathBuf, CircuitError> {
         let mut buf = Vec::new();
@@ -444,7 +454,7 @@ fn write_slot_witness(
     };
     let pub_path = write(witness.public(), "pub")?;
     let nonpub_path = write(witness.non_public(), "nonpub")?;
-    Ok((pub_path, nonpub_path))
+    Ok((pub_path, nonpub_path, witness_words))
 }
 
 /// Locate (building once if necessary) the `binius-proof-runner` binary. The runner is
@@ -522,14 +532,17 @@ pub fn prove_and_verify(circuit: &Circuit, case: &Case) -> Result<ProofStats, Ci
 
     // Serialize one witness per slot; collect the temp paths to feed the runner and to
     // clean up afterwards.
+    let mut witness_words_total = 0usize;
     let mut witness_paths: Vec<(PathBuf, PathBuf)> = Vec::with_capacity(n);
     for i in 0..n {
-        witness_paths.push(write_slot_witness(
+        let (pub_path, nonpub_path, witness_words) = write_slot_witness(
             single,
             &case.key_bytes[i],
             &case.msg,
             &case.sig_bytes[i],
-        )?);
+        )?;
+        witness_words_total += witness_words;
+        witness_paths.push((pub_path, nonpub_path));
     }
 
     let mut cmd = Command::new(&runner);
@@ -573,9 +586,12 @@ pub fn prove_and_verify(circuit: &Circuit, case: &Case) -> Result<ProofStats, Ci
     let prove_ms = parse(it.next(), "prove_ms")?;
 
     Ok(ProofStats {
+        // `n_bitand`/`n_intmul` count the shared single-sig slot circuit (identical
+        // for every slot); `n_witness_words`, `prove_ms` and `proof_bytes` are
+        // aggregates summed across all n slots.
         n_bitand: stat.n_and_constraints,
         n_intmul: stat.n_mul_constraints,
-        n_witness_words: stat.n_witness,
+        n_witness_words: witness_words_total,
         prove_ms,
         proof_bytes,
     })

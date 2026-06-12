@@ -1,4 +1,4 @@
-# Results
+# SP1 Results
 
 Execute-mode cycle counts for a 6-of-10 ML-DSA-65 proof inside SP1. All three configurations verified successfully in the zkVM (`all valid: true`). Cycles are the portable, host-independent metric.
 
